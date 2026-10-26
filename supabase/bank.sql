@@ -185,7 +185,7 @@ begin
   insert into public.bank_cards (user_id, last4, holder, expiry_month, expiry_year, cvv_hash, brand)
   values (
     uid, v_last4, upper(v_holder), 12, extract(year from now())::int + 5,
-    encode(digest(v_seed, 'sha256'), 'hex'), 'Visa'
+    encode(extensions.digest(v_seed, 'sha256'), 'hex'), 'Visa'
   )
   returning * into card;
 
@@ -248,6 +248,59 @@ end;
 $$;
 
 grant execute on function public.bank_move(text, text, numeric, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- MOVIMENTAÇÃO EM NOME DE OUTRO TITULAR
+--   Usada só por funções internas (ex.: crédito de empréstimo liberado pelo
+--   admin na conta do cliente). Não é exposta ao cliente.
+-- ---------------------------------------------------------------------
+create or replace function public.bank_move_for(
+  p_user_id      uuid,
+  p_kind         text,
+  p_description  text,
+  p_amount       numeric,
+  p_counterparty text default null,
+  p_document_id  text default null
+)
+returns public.bank_transactions
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  acct    public.bank_accounts;
+  tx      public.bank_transactions;
+  v_avail numeric(14,2);
+begin
+  if p_user_id is null then raise exception 'titular não informado'; end if;
+  if p_amount = 0 then raise exception 'valor inválido'; end if;
+  if p_kind not in ('pix_envio','pix_recebimento','transferencia_envio','transferencia_recebimento',
+                    'boleto','credito_emprestimo','debito_automatico','estorno','abertura','tarifa') then
+    raise exception 'tipo de movimentação inválido';
+  end if;
+
+  select * into acct from public.bank_accounts where user_id = p_user_id for update;
+  if not found then raise exception 'conta não encontrada'; end if;
+  if acct.status <> 'ativa' then raise exception 'conta não está ativa'; end if;
+
+  v_avail := acct.balance + acct.overdraft;
+  if p_amount < 0 and v_avail + p_amount < 0 then
+    raise exception 'saldo insuficiente';
+  end if;
+
+  update public.bank_accounts set balance = balance + p_amount where id = acct.id;
+
+  insert into public.bank_transactions (user_id, kind, description, amount, counterparty, document_id)
+  values (p_user_id, p_kind, p_description, p_amount, p_counterparty, p_document_id)
+  returning * into tx;
+
+  return tx;
+end;
+$$;
+
+-- Só o backend (service_role) e o admin podem mover a conta de terceiros.
+revoke all on function public.bank_move_for(uuid, text, text, numeric, text, text) from public, anon, authenticated;
+grant execute on function public.bank_move_for(uuid, text, text, numeric, text, text) to service_role;
 
 -- ---------------------------------------------------------------------
 -- CHAVE PIX: criar e remover
@@ -430,6 +483,7 @@ as $$
 declare
   loan public.loan_requests;
   uid  uuid;
+  tx   public.bank_transactions;
 begin
   select * into loan from public.loan_requests where id = p_loan_id;
   if not found then raise exception 'pedido não encontrado'; end if;
@@ -438,17 +492,15 @@ begin
   uid := loan.user_id;
   if uid <> auth.uid() and not public.is_admin() then raise exception 'não autorizado'; end if;
 
-  -- idempotente: não credita duas vezes
-  if exists (select 1 from public.bank_transactions
-              where user_id = uid and kind = 'credito_emprestimo' and document_id = p_loan_id::text) then
-    return (select * from public.bank_transactions
-             where user_id = uid and kind = 'credito_emprestimo' and document_id = p_loan_id::text limit 1);
-  end if;
+  -- idempotente: não credita duas vezes o mesmo pedido
+  select * into tx from public.bank_transactions
+   where user_id = uid and kind = 'credito_emprestimo' and document_id = p_loan_id::text
+   order by created_at asc
+   limit 1;
+  if found then return tx; end if;
 
-  perform set_config('request.jwt.claims',
-    json_build_object('sub', uid::text, 'role', 'authenticated')::text, true);
-
-  return public.bank_move('credito_emprestimo',
+  -- o credito entra sempre na conta do titular do pedido, nao na de quem chamou
+  return public.bank_move_for(uid, 'credito_emprestimo',
     'Crédito de empréstimo liberado', loan.amount, 'SobreImpréstimos', p_loan_id::text);
 end;
 $$;
@@ -490,15 +542,26 @@ security definer
 set search_path = public
 as $$
 declare
-  v_name  text := coalesce(new.raw_user_meta_data ->> 'full_name', '');
+  v_name   text := coalesce(new.raw_user_meta_data ->> 'full_name', '');
+  v_cpf    text := nullif(regexp_replace(coalesce(new.raw_user_meta_data ->> 'cpf', ''), '\D', '', 'g'), '');
+  v_phone  text := nullif(regexp_replace(coalesce(new.raw_user_meta_data ->> 'phone', ''), '\D', '', 'g'), '');
   v_agency text := '0001';
   v_number text;
   v_digit  text;
-  v_seed  text;
-  attempt int := 0;
+  v_seed   text;
+  attempt  int := 0;
 begin
+  -- CPF é obrigatório no perfil, mas um metadado ausente ou torto não pode
+  -- derrubar o cadastro inteiro: normalizamos e falhamos com mensagem clara.
+  if v_cpf is null or v_cpf !~ '^[0-9]{11}$' then
+    raise exception 'CPF ausente ou inválido no cadastro';
+  end if;
+
   insert into public.profiles (id, full_name, cpf, phone)
-  values (new.id, v_name, new.raw_user_meta_data ->> 'cpf', new.raw_user_meta_data ->> 'phone');
+  values (new.id, v_name, v_cpf, v_phone)
+  on conflict (id) do update
+    set full_name = excluded.full_name,
+        phone     = excluded.phone;
 
   -- conta bancária
   loop
@@ -517,7 +580,7 @@ begin
   v_seed := new.id::text || clock_timestamp()::text;
   insert into public.bank_cards (user_id, last4, holder, expiry_month, expiry_year, cvv_hash, brand)
   values (new.id, lpad((abs(hashtext(v_seed)) % 10000)::text, 4, '0'), upper(v_name),
-          12, extract(year from now())::int + 5, encode(digest(v_seed, 'sha256'), 'hex'), 'Visa')
+          12, extract(year from now())::int + 5, encode(extensions.digest(v_seed, 'sha256'), 'hex'), 'Visa')
   on conflict (user_id) do nothing;
 
   return new;

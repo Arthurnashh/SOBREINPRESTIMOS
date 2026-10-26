@@ -34,20 +34,30 @@ revoke insert, update, delete on public.profiles from authenticated, anon;
 grant select on public.profiles to authenticated;
 grant update (full_name, phone) on public.profiles to authenticated;
 
--- Cria o perfil automaticamente no cadastro, a partir dos metadados do signUp
+-- Cria o perfil automaticamente no cadastro, a partir dos metadados do signUp.
+-- O CPF é obrigatório no perfil: normalizamos os dígitos e, se faltar, falhamos
+-- com mensagem clara em vez de estourar um NOT NULL cru.
+-- (A versão completa, que também abre conta e cartão, está em bank.sql.)
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_cpf   text := nullif(regexp_replace(coalesce(new.raw_user_meta_data ->> 'cpf', ''), '\D', '', 'g'), '');
+  v_phone text := nullif(regexp_replace(coalesce(new.raw_user_meta_data ->> 'phone', ''), '\D', '', 'g'), '');
 begin
+  if v_cpf is null or v_cpf !~ '^[0-9]{11}$' then
+    raise exception 'CPF ausente ou inválido no cadastro';
+  end if;
+
   insert into public.profiles (id, full_name, cpf, phone)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'full_name', ''),
-    new.raw_user_meta_data ->> 'cpf',
-    new.raw_user_meta_data ->> 'phone'
+    v_cpf,
+    v_phone
   );
   return new;
 end;
