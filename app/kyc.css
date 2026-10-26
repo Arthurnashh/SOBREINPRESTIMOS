@@ -306,6 +306,53 @@
 
 .kyc-btn { width: 100%; justify-content: center; }
 
+/*
+ * Barra de ações de cada etapa (os botões de continuar).
+ *
+ * Esta classe não tinha estilo NENHUM: os botões ficavam soltos no fim do
+ * formulário, sem separação nem largura, e o de continuar passava despercebido.
+ * Agora é uma faixa destacada, com o botão principal ocupando a largura toda
+ * no celular.
+ */
+.kyc-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--kyc-line);
+}
+
+.kyc-acoes .bank-acao.principal {
+  min-width: 220px;
+  justify-content: center;
+  padding: 13px 22px;
+  font-size: 14.5px;
+}
+
+.kyc-acoes .bank-acao:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kyc-acoes .fine {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .kyc-acoes {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .kyc-acoes .bank-acao,
+  .kyc-acoes .bank-acao.principal {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 /* Aviso de por que o clique ainda não vai render boa foto. Fica logo abaixo do
    botão, que agora está sempre habilitado. */
 .kyc-aviso-clique {
