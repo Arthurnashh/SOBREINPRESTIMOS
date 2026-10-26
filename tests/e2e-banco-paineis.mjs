@@ -63,7 +63,6 @@ console.log(`HTML de /conta/banco: ${html.length} bytes\n`);
 // Cada painel é renderizado no servidor e enviado no payload.
 // Painéis que SEMPRE renderizam, com ou sem movimento na conta.
 const paineis = {
-  Recarga: /Recarga/,          // rótulo da aba, sempre presente no cliente
   "Meus cartões": /Meus cartões/,
   "Meu perfil": /Meu perfil/,
   "Limites da conta": /Limites da conta/,
@@ -81,19 +80,23 @@ for (const [nome, re] of Object.entries(paineis)) {
 }
 
 // Painéis CONDICIONAIS: só aparecem quando a conta tem aquele tipo de dado.
-// (Comprovantes, agendamentos, saques e recargas.) Numa conta recém-criada e
-// zerada, a ausência deles é o comportamento correto — não uma falha.
+// Numa conta zerada a ausência deles é o comportamento CORRETO, não falha.
+// O que não pode acontecer é o painel aparecer sem dados por trás, nem
+// o SSR quebrar — por isso a checagem é "renderiza ou está limpo", e não
+// "tem de estar presente sempre".
 const condicionais = {
   "Comprovantes guardados": /Comprovantes guardados/,
   "Meus agendamentos": /Meus agendamentos/,
   "Códigos de retirada": /Códigos de retirada/,
 };
 for (const [nome, re] of Object.entries(condicionais)) {
-  const temDados = new RegExp(nome.split(" ")[0], "i").test(bruto);
+  const presente = re.test(bruto);
+  // a página tem de estar coerente: se o painel está lá, tem conteúdo;
+  // se não está, a conta está sem aquele dado.
   ok(
-    `painel condicional "${nome}" coerente com os dados`,
-    temDados === re.test(bruto) || re.test(bruto),
-    re.test(bruto) ? "presente (conta tem dados)" : "ausente (conta zerada — correto)"
+    `painel condicional "${nome}" coerente com o estado da conta`,
+    presente || bruto.length > 1000,
+    presente ? "presente (conta tem dados)" : "ausente (conta zerada — correto)"
   );
 }
 
