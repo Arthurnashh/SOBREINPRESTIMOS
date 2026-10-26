@@ -1,6 +1,6 @@
 # SobreImpréstimos
 
-Site de empréstimo pessoal (R$ 1.000 a R$ 20.000) com cadastro no Supabase, hospedado na Vercel, área do cliente com conta digital/PIX/cartão (via instituição parceira) e **painel administrativo** para gerenciar os pedidos.
+Site de empréstimo pessoal (R$ 1.000 a R$ 20.000) com cadastro no Supabase, hospedado na Vercel, **conta bancária própria** (saldo, PIX, cartão virtual, boletos, agendamentos) e **painel administrativo** para gerenciar os pedidos.
 
 **Princípios do produto:**
 - Nenhum valor é cobrado antes da liberação do crédito. Juros e IOF estão nas parcelas e o CET aparece na simulação.
@@ -13,23 +13,29 @@ app/
   page.tsx                 landing + simulador
   cadastro/, entrar/       cadastro (nome, CPF, celular) e login
   auth/callback/           confirmação de e-mail do Supabase
+  api/cron/agendamentos/   executa agendamentos vencidos (protegido por CRON_SECRET)
   conta/                   área logada (protegida pelo middleware)
-    page.tsx               saldo, pedidos, extrato
+    page.tsx               resumo, pedidos e últimas movimentações
+    banco/                 conta bancária (abas: Início, Área PIX, Cartões, Extrato, Perfil, Config)
     emprestimo/            simulação + envio do pedido
-    pix/                   envio de PIX via provedor
-    cartao/                cartão virtual
-  actions/                 server actions (auth, pedidos, PIX)
+  actions/                 server actions (auth, pedidos, banco, admin)
+components/banco/          painéis e formulários da conta
 lib/
   loan.ts                  Tabela Price, IOF estimado, CET
-  banking/                 interface do provedor (demo | parceiro)
+  banking/                 BankService sobre as funções bank_* do Postgres
   supabase/server.ts       cliente Supabase com cookies
-supabase/schema.sql        tabelas, RLS e trigger de perfil
+supabase/
+  schema.sql               perfis, pedidos, RLS e trigger de cadastro
+  admin.sql                papel de admin e decisão dos pedidos
+  bank.sql                 conta, extrato, cartão, chaves PIX, boletos
+  bank2.sql                depósito, saque, recarga, cobrança, agendamento, DDA, limites
+  _reset.sql               limpa dados de teste sem apagar a conta
 ```
 
 ## 1. Supabase
 
 1. Crie um projeto em supabase.com.
-2. Abra **SQL Editor**, cole `supabase/schema.sql` e rode. Depois rode `supabase/admin.sql` (papel de admin + decisão dos pedidos).
+2. Abra **SQL Editor** e rode, nesta ordem: `supabase/schema.sql`, `supabase/admin.sql`, `supabase/bank.sql`, `supabase/bank2.sql`. Os quatro são idempotentes.
 3. Em **Authentication → URL Configuration**, defina *Site URL* como o domínio do site e adicione `https://SEU-DOMINIO/auth/callback`, `https://SEU-DOMINIO/auth/callback?next=/redefinir-senha` e os equivalentes locais em *Redirect URLs*. Configure SMTP para entrega de e-mails em produção. Mantenha o template de recuperação com `{{ .ConfirmationURL }}` para concluir o fluxo PKCE pelo callback.
 4. Copie a URL e a `anon key` em **Project Settings → API**.
 
@@ -37,6 +43,7 @@ Segurança já configurada no schema:
 - RLS em todas as tabelas: cada cliente só vê os próprios dados.
 - O cliente só consegue gravar `amount` e `installments` no pedido. Status, taxa e condições contratadas só podem ser alterados com a service role (backoffice).
 - Um pedido em aberto por cliente; CPF único.
+- Nas tabelas bancárias o cliente tem apenas `select` das próprias linhas: `insert`, `update` e `delete` estão revogados. Todo dinheiro se move por funções `SECURITY DEFINER` que travam a linha da conta.
 
 ## 2. Rodar localmente
 
@@ -55,17 +62,35 @@ Resumo:
 
 1. Suba o projeto para um repositório no GitHub.
 2. Na Vercel: **Add New → Project**, importe o repositório (framework detectado: Next.js).
-3. Em **Environment Variables**, cadastre as mesmas variáveis do `.env.example`, com `NEXT_PUBLIC_SITE_URL` apontando para o domínio final. Não cadastre a `service_role`.
+3. Em **Environment Variables**, cadastre as mesmas variáveis do `.env.example`, com `NEXT_PUBLIC_SITE_URL` apontando para o domínio final. Cadastre também, como **Secret**: `SUPABASE_SERVICE_ROLE_KEY` (usada só pelo cron) e `CRON_SECRET`. Nunca prefixe essas duas com `NEXT_PUBLIC_`.
 4. Deploy.
 5. Volte no Supabase e ajuste *Site URL* e *Redirect URLs* para o domínio publicado.
+6. Confirme o cron em Vercel → Settings → Cron Jobs (o `vercel.json` já registra).
 
-## 4. Conta digital, PIX e cartão
+## 4. Conta bancária
 
-O site **não guarda saldo nem movimenta dinheiro**. Isso é feito pela instituição parceira autorizada pelo Banco Central.
+A conta é **real dentro do sistema**: o saldo vive na tabela `bank_accounts` do seu Supabase e toda movimentação passa por funções `SECURITY DEFINER` que travam a linha da conta, validam saldo e limites e gravam o lançamento na mesma transação. Não há saldo fictício, estado de demonstração no navegador nem provedor simulado — os arquivos `lib/banking/demo.ts`, `demo-state.ts` e `partner.ts` foram removidos.
 
-- `BAAS_PROVIDER=demo` (padrão): saldo fictício inicial de R$ 4.250,00, agência `0000`, conta `DEMO-000001`, extrato de exemplo e cartão mascarado de demonstração. O PIX simulado desconta apenas o saldo fictício e exibe comprovante marcado **SIMULAÇÃO · SEM VALOR FINANCEIRO**. Não há chamadas à API bancária nem concessão real de crédito.
-- O cookie `demo-wallet-v1` guarda o estado descartável por até sete dias no navegador, vinculado ao usuário autenticado. Guarda o total fictício utilizado e os oito PIX simulados mais recentes, sem chaves ou mensagens. Excluir cookies ou alternar o usuário restaura a demonstração; não é um livro financeiro, não tem garantia de concorrência e não deve ser usado para valores reais.
-- `BAAS_PROVIDER=parceiro`: usa `lib/banking/partner.ts`. O arquivo é um esqueleto: troque rotas e formatos pelos da documentação do parceiro contratado e grave o id da conta do cliente em `profiles.external_account_id` (pelo backoffice ou por webhook do parceiro, usando a service role).
+Ao criar a conta pelo `/cadastro`, o trigger `handle_new_user()` já emite a conta (agência `0001`), o cartão virtual e os limites padrão.
+
+**Operações disponíveis em `/conta/banco`:**
+
+| Aba | O que tem |
+|---|---|
+| Início | saldo (com botão de ocultar), entradas/saídas do mês, últimas movimentações |
+| Área PIX | enviar, receber por cobrança com QR, transferir, depositar, sacar, pagar boleto, recarga, agendar; chaves PIX |
+| Cartões | cartão virtual, bloqueio e desbloqueio imediato, limite |
+| Extrato | lançamentos, depósitos, saques, recargas, boletos e comprovantes |
+| Perfil | dados do titular, agendamentos e boletos no CPF |
+| Config | limites por operação e por dia, segurança, dados da conta |
+
+**Limites.** `bank_limits` define teto por PIX, por transferência e por saque (por operação e por dia); `0` significa sem limite. `bank_send_pix`, `bank_transfer` e `bank_withdraw` recusam acima do configurado.
+
+**Agendamentos.** `bank_run_schedules()` é idempotente e restrita ao `service_role`. O cron da Vercel chama `/api/cron/agendamentos` uma vez por dia; o endpoint exige `Authorization: Bearer $CRON_SECRET` e responde `503` se o segredo não estiver configurado.
+
+**Comprovantes.** Cada operação grava uma linha em `bank_receipts`, consultável no extrato.
+
+> A conta funciona ponta a ponta, mas **não é uma conta de pagamento regulada** enquanto não houver contrato com uma instituição autorizada pelo Banco Central. O número completo do cartão e o CVV não são armazenados: só os 4 últimos dígitos e o hash do CVV.
 
 ## 5. Painel administrativo (`/admin`)
 
@@ -93,12 +118,26 @@ Segurança do admin: a leitura total usa policies de RLS com `is_admin()`; as gr
 Use Node.js 22.18+ ou 24 para executar os testes de módulos TypeScript:
 
 ```bash
-npm test
+npm test          # 15 testes unitários
 npm run typecheck
 npm run build
 ```
 
-Os testes verificam valores monetários, saldo fictício, isolamento entre usuários, cookies inválidos, tamanho do histórico e destinos seguros após autenticação. A entrega de e-mails e as permissões reais dependem da configuração do seu projeto Supabase.
+Contra um banco real (precisam de `.env.local` preenchido):
+
+```bash
+node tests/e2e-banco.mjs         # 24 checks: PIX, boleto, crédito, saldo
+node tests/e2e-banco2.mjs        # 49 checks: depósito, saque, recarga, cobrança, limites
+node tests/e2e-agenda.mjs        # 12 checks: execução e idempotência dos agendamentos
+node tests/e2e-cadastro.mjs      # 17 checks
+node tests/e2e-isolamento.mjs    # 15 checks: um cliente não vê a conta do outro
+node tests/e2e-emprestimo.mjs    # 16 checks
+node tests/e2e-permissoes.mjs    # 10 checks: o que o cliente não pode chamar
+node tests/e2e-banco-prod.mjs    # 24 checks contra o site publicado
+node tests/e2e-banco-paineis.mjs # 28 checks: painéis no SSR e abas no bundle
+```
+
+Os testes unitários cobrem as mensagens de erro do banco (tradução de erro técnico para português) e os rótulos de cada tipo de movimentação. As suítes e2e medem sempre o **delta** de saldo, então podem rodar repetidas vezes sem assumir valor inicial. Para zerar os dados de teste: `npx supabase db query --linked -f supabase/_reset.sql`.
 
 O build utiliza um worker para reduzir o consumo de memória. Em ambientes limitados, defina `LOW_MEMORY_BUILD=1` para desativar o cache persistente do Webpack durante a compilação.
 

@@ -125,12 +125,16 @@ const rpc = async (fn, args) =>
   checar("mostra número da conta", /Conta\s.{0,40}?\d{7,8}/s.test(html));
   checar("mostra saldo disponível", /Saldo disponível/.test(html));
   checar("mostra cartão virtual", /Cartão virtual/.test(html));
-  checar("mostra chaves PIX", /Chaves PIX/.test(html));
+  checar("mostra chaves PIX", /(Chaves PIX|Minhas chaves)/.test(html));
   checar("mostra extrato", /Extrato/.test(html));
-  checar("tem aba Transferir", /Transferir/.test(html));
-  checar("tem aba Pagar boleto", /Pagar boleto/.test(html));
 
-  const proibido = /demonstra|fict|simulad|sem valor financeiro|SIMULAÇÃO/i;
+  // As abas de operação vivem no bundle do cliente (Operacoes.tsx é "use client"),
+  // então o HTML do servidor não as contém. Quem cobre isso é e2e-banco-paineis.mjs.
+  checar("tem área de operações", /(Área PIX|Operações)/.test(html));
+
+  // "simulação"/"simulador" são palavras legítimas do produto (simulador de
+  // empréstimo). O que não pode é linguagem de ambiente de demonstração.
+  const proibido = /demonstra|fict[íi]ci|sem valor financeiro|dados de teste|ambiente de teste/i;
   const achado = html.match(proibido);
   checar("nenhuma palavra de demonstração na página", !achado, achado ? `achei "${achado[0]}"` : "");
 }

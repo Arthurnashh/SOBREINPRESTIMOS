@@ -55,12 +55,18 @@ no painel. Para um site dormente, vale o plano pago de US$25.
 2. `supabase/admin.sql` — papel de admin, leitura total, `admin_set_decision`
 3. `supabase/bank.sql` — **conta bancária**: saldo, extrato, cartão, chaves PIX,
    boletos e as funções que movimentam dinheiro
+4. `supabase/bank2.sql` — **conta completa**: depósito, saque, recarga, cobrança
+   PIX, agendamento, DDA, comprovantes, tarifas, limites e dados cadastrais
 
-Os três são idempotentes (`if not exists` / `drop policy if exists` /
+Os quatro são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
-> conta e cartão no cadastro. Rode-o por último.
+> conta e cartão no cadastro. `bank2.sql` amplia a lista de tipos de
+> movimentação — e essa lista existe em **dois** lugares: no `check` da tabela
+> `bank_transactions` e dentro de `bank_move`/`bank_move_for`. Mexer só no
+> `check` faz a função recusar a operação com "tipo de movimentação inválido".
+> Rode os dois por último, nesta ordem.
 
 ### A conta bancária
 
@@ -75,6 +81,16 @@ linha da conta, validam saldo/limite e gravam o lançamento na mesma transação
 | `bank_cards` | cartão virtual (só os 4 últimos dígitos e o hash do CVV) |
 | `bank_pix_keys` | chaves PIX do titular |
 | `bank_boletos` | boletos pagos |
+| `bank_deposits` | depósitos recebidos, com forma e origem |
+| `bank_withdrawals` | saques, com o código de retirada |
+| `bank_topups` | recargas de celular |
+| `bank_schedules` | agendamentos futuros (status: agendado/executado/cancelado/falhou) |
+| `bank_dda` | boletos registrados contra o CPF do titular |
+| `bank_pix_charges` | cobranças PIX com o código copia e cola |
+| `bank_receipts` | comprovante de cada operação |
+| `bank_fees` | tarifas cobradas (hoje todas zeradas) |
+| `bank_profiles` | endereço, profissão e renda do titular |
+| `bank_limits` | teto por PIX, transferência e saque, por operação e por dia |
 
 Ao criar a conta pelo `/cadastro`, o trigger `handle_new_user()` já emite
 a conta (agência `0001`) e o cartão virtual. Se a conta não existir por
@@ -82,7 +98,19 @@ qualquer motivo, `/conta/banco` abre na primeira visita.
 
 > **`bank_move_for` move dinheiro em nome de outra pessoa** e por isso é
 > restrita ao `service_role`. Se um cliente comum chamá-la, recebe `403`.
-> É ela que credita o empréstimo liberado na conta do titular.
+> É ela que credita o empréstimo liberado e executa os agendamentos.
+
+### Agendamentos
+
+`bank_run_schedules()` é SECURITY DEFINER, restrita ao `service_role`, e
+**idempotente**: marca o agendamento como `executado` antes de debitar, então
+rodar duas vezes no mesmo dia não cobra em dobro. Agendamento sem saldo vira
+`falhou` em vez de travar a fila.
+
+Quem a chama é o cron da Vercel, diariamente, via `/api/cron/agendamentos`
+(configurado em `vercel.json`). O endpoint exige o header
+`Authorization: Bearer $CRON_SECRET`; sem o segredo configurado ele responde
+`503` e não executa nada.
 
 ### Crédito do empréstimo
 
@@ -91,13 +119,15 @@ o valor cai na conta do cliente. A operação é **idempotente**: liberar duas
 vezes não credita em dobro. Se aparecer "credito na conta falhou", rode a
 liberação de novo com segurança.
 
-Confira que os três schemas pegaram:
+Confira que os quatro schemas pegaram:
 
 ```sql
 select
   (select count(*) from public.profiles)          as perfis,
   (select count(*) from public.bank_accounts)     as contas,
-  (select count(*) from public.bank_cards)        as cartoes;
+  (select count(*) from public.bank_cards)        as cartoes,
+  (select count(*) from public.bank_limits)       as limites,
+  (select count(*) from public.bank_receipts)     as comprovantes;
 ```
 
 ## Passo 3 — Criar o primeiro administrador
@@ -157,13 +187,40 @@ npm run dev
 Roteiro de teste:
 
 - [ ] `/cadastro` cria conta e cai na área do cliente
+- [ ] a conta bancária abre junto com o cadastro (agência `0001`, cartão virtual emitido)
+- [ ] `/conta/banco` mostra saldo, abas (Início, Área PIX, Cartões, Extrato, Perfil, Config) e o olho de ocultar saldo
+- [ ] depositar, sacar e recarregar celular mexem no saldo e guardam comprovante
+- [ ] gerar cobrança PIX devolve um código copia e cola
+- [ ] agendar para hoje e rodar `bank_run_schedules` debita uma vez só (idempotente)
 - [ ] `/conta/emprestimo` envia pedido e ele aparece em `/conta`
 - [ ] receber pedido do mesmo cliente duas vezes dá "já tem um pedido em andamento"
 - [ ] `/admin` lista o pedido (só com `is_admin = true`)
 - [ ] aprovar com taxa de 3,99% a.m. calcula parcela, IOF e CET
 - [ ] aprovar com 25% a.m. é **recusado** (teto de 20%)
+- [ ] liberar um pedido credita a conta **uma vez só**, mesmo clicando duas vezes
 - [ ] `/admin/usuarios` busca por nome, CPF e telefone
 - [ ] `/esqueci-senha` envia link e o link redefine a senha
+
+Suítes automatizadas (precisam de `.env.local` real):
+
+```bash
+npm test                        # 15 testes unitários (mensagens de erro, rótulos)
+node tests/e2e-banco.mjs        # 24 checks: PIX, boleto, crédito, saldo
+node tests/e2e-banco2.mjs       # 49 checks: depósito, saque, recarga, cobrança, limites, DDA
+node tests/e2e-agenda.mjs       # 12 checks: execução e idempotência dos agendamentos
+node tests/e2e-cadastro.mjs     # 17 checks
+node tests/e2e-isolamento.mjs   # 15 checks: um cliente não vê a conta do outro
+node tests/e2e-emprestimo.mjs   # 16 checks
+node tests/e2e-permissoes.mjs   # 10 checks: o que o cliente não pode chamar
+node tests/e2e-banco-prod.mjs   # 24 checks contra o site publicado
+node tests/e2e-banco-paineis.mjs # 28 checks: painéis no SSR e abas no bundle
+```
+
+Para zerar os dados de teste sem apagar a conta:
+
+```bash
+npx supabase db query --linked -f supabase/_reset.sql
+```
 
 ## Passo 6 — Deploy na Vercel
 
@@ -177,22 +234,40 @@ Roteiro de teste:
    Framework detectado: **Next.js**. Build e output: deixe o padrão.
 3. **Environment Variables** — cadastre para Production, Preview e Development:
 
-   | Nome | Valor |
-   |---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxx.supabase.co` |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | a anon key |
-   | `NEXT_PUBLIC_SITE_URL` | `https://SEU-PROJETO.vercel.app` |
-   | `NEXT_PUBLIC_EMPRESA_NOME` | nome real da empresa |
-   | `NEXT_PUBLIC_EMPRESA_CNPJ` | CNPJ real |
-   | `NEXT_PUBLIC_INSTITUICAO_PARCEIRA` | instituição parceira real |
-   | `NEXT_PUBLIC_TAXA_MENSAL` | taxa real do produto, ex. `0.0399` |
-   | `NEXT_PUBLIC_PRIVACIDADE_EMAIL` | canal real de privacidade |
-   | `BAAS_PROVIDER` | `demo` |
+   | Nome | Valor | Tipo |
+   |---|---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxx.supabase.co` | Config |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | a anon key | Config |
+   | `NEXT_PUBLIC_SITE_URL` | `https://SEU-PROJETO.vercel.app` | Config |
+   | `NEXT_PUBLIC_EMPRESA_NOME` | nome real da empresa | Config |
+   | `NEXT_PUBLIC_EMPRESA_CNPJ` | CNPJ real (deixe vazio se não tiver — o rodapé omite) | Config |
+   | `NEXT_PUBLIC_INSTITUICAO_PARCEIRA` | instituição parceira real (vazio = texto genérico) | Config |
+   | `NEXT_PUBLIC_TAXA_MENSAL` | taxa real do produto, ex. `0.0399` | Config |
+   | `NEXT_PUBLIC_PRIVACIDADE_EMAIL` | canal real de privacidade | Config |
+   | `SUPABASE_SERVICE_ROLE_KEY` | a service role key | **Secret** |
+   | `CRON_SECRET` | string aleatória longa | **Secret** |
 
-   **Não cadastre `service_role` aqui.** Nada no código atual precisa dela em runtime.
+   As duas últimas **precisam ser Secret**, nunca `NEXT_PUBLIC_`:
+   - `SUPABASE_SERVICE_ROLE_KEY` é usada só pela rota de cron. Ela ignora RLS —
+     se vazar para o navegador, qualquer pessoa lê e altera qualquer conta.
+   - `CRON_SECRET` protege `/api/cron/agendamentos`. Sem ela, o endpoint
+     responde `503` e a fila de agendamentos não roda.
+
+   Gere o segredo com:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+   > **Nunca** prefixe essas duas com `NEXT_PUBLIC_`. Esse prefixo embute o
+   > valor no JavaScript que vai para o navegador.
+
 4. **Deploy**.
-5. Volte no Supabase e ajuste **Site URL** e **Redirect URLs** para o domínio `.vercel.app`.
-6. Refaça o roteiro de teste no domínio publicado.
+5. O `vercel.json` já registra o cron diário (`0 9 * * *`) em
+   `/api/cron/agendamentos`. Confirme em Vercel → Settings → Cron Jobs.
+   Plano Hobby permite cron **uma vez por dia** — suficiente para agendamentos.
+6. Volte no Supabase e ajuste **Site URL** e **Redirect URLs** para o domínio
+   `.vercel.app`, incluindo `https://SEU-PROJETO.vercel.app/auth/callback`.
+7. Refaça o roteiro de teste no domínio publicado.
 
 ## Passo 7 — Depois do deploy
 
