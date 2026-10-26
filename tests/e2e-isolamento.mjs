@@ -150,6 +150,21 @@ checar("dois usuários de teste criados", !!a.token && !!b.token);
 
 // ------------------------------------------------ B nao debita a conta de A
 {
+  // Desde o KYC, movimentar exige identidade aprovada. Aprova os dois para
+  // que a falha abaixo venha do SALDO, que é o que este teste quer medir.
+  for (const u of [a, b]) {
+    await fetch(`${URL_}/rest/v1/kyc_submissions?user_id=eq.${u.id}`, {
+      method: "PATCH",
+      headers: {
+        apikey: SERVICE,
+        Authorization: `Bearer ${SERVICE}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ status: "aprovado" }),
+    });
+  }
+
   const contasA = await sel(a.token, "bank_accounts");
   const ag = contasA[0].agency;
   const num = contasA[0].number;

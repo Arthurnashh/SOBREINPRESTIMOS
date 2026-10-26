@@ -57,8 +57,10 @@ no painel. Para um site dormente, vale o plano pago de US$25.
    boletos e as funções que movimentam dinheiro
 4. `supabase/bank2.sql` — **conta completa**: depósito, saque, recarga, cobrança
    PIX, agendamento, DDA, comprovantes, tarifas, limites e dados cadastrais
+5. `supabase/kyc.sql` — **verificação de identidade**: bucket privado, envio de
+   documentos, biometria, fila de análise e o bloqueio de movimentação
 
-Os quatro são idempotentes (`if not exists` / `drop policy if exists` /
+Os cinco são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
@@ -66,7 +68,8 @@ Os quatro são idempotentes (`if not exists` / `drop policy if exists` /
 > movimentação — e essa lista existe em **dois** lugares: no `check` da tabela
 > `bank_transactions` e dentro de `bank_move`/`bank_move_for`. Mexer só no
 > `check` faz a função recusar a operação com "tipo de movimentação inválido".
-> Rode os dois por último, nesta ordem.
+> `kyc.sql` **redefine `bank_move`** para inserir o gate do KYC antes da checagem
+> de saldo, então tem de ser o último. Rode os três por último, nesta ordem.
 
 ### A conta bancária
 
@@ -112,6 +115,52 @@ Quem a chama é o cron da Vercel, diariamente, via `/api/cron/agendamentos`
 `Authorization: Bearer $CRON_SECRET`; sem o segredo configurado ele responde
 `503` e não executa nada.
 
+### Verificação de identidade (KYC)
+
+Ninguém movimenta dinheiro para fora sem identidade verificada. **Entrada é
+sempre liberada** (depósito, PIX recebido, crédito de empréstimo, estorno) —
+travar entrada só prenderia o cliente. O que exige aprovação é a **saída**:
+PIX enviado, transferência, boleto, saque, recarga, agendamento, débito
+automático e tarifa.
+
+| Tabela | Guarda |
+|---|---|
+| `kyc_submissions` | um registro por pessoa: dados, endereço, documento, comprovante, caminhos das fotos, biometria e a decisão |
+| `kyc_events` | trilha de auditoria: de qual status para qual, quando, por quem e com que observação |
+
+Os arquivos ficam no bucket **privado** `kyc`, em pastas por `user_id`. As
+políticas de Storage garantem que cada cliente só lê e grava na própria pasta,
+que o admin lê todas e que ninguém mais lê nada. A escrita nas tabelas é
+revogada de `anon` e `authenticated`: só entra pelas funções `kyc_*`
+(SECURITY DEFINER).
+
+O que o cliente envia:
+
+- **dados pessoais** — nome completo, nascimento (18+), CPF, nome da mãe, celular e e-mail
+- **endereço** — CEP, logradouro, número, bairro, cidade e UF
+- **documento** — CNH **ou** RG, frente e verso, com número e órgão emissor
+- **comprovante de endereço** — tipo escolhido pelo cliente
+- **selfie segurando o documento**
+- **biometria** — cinco ângulos do rosto (frontal, direita, esquerda, sorriso e aproximado)
+  com prova de vida por movimento
+
+Status possíveis: `nao_iniciado`, `em_analise`, `aprovado`, `recusado` e
+`pendente` (correção pedida). Só `aprovado` libera movimentação.
+
+O fluxo do cliente é em `/conta/verificacao`. A análise é em `/admin/kyc`:
+o admin vê os dados, abre cada foto por URL assinada de 10 minutos e decide.
+**Recusar ou pedir correção exige justificativa** — aprovar não exige.
+
+> **O que a biometria faz e o que não faz.** A captura, a validação de
+> qualidade (nitidez, luz, enquadramento, tamanho do rosto) e a prova de vida
+> por movimento são reais e rodam no navegador. A **comparação 1:1** entre a
+> selfie e a foto do documento **não** está implementada: isso exige um
+> fornecedor pago (AWS Rekognition, Unico, idwall). O ponto de integração está
+> pronto em `lib/kyc/service.ts` — hoje a decisão final é humana.
+
+Se o KYC de um cliente for aprovado direto no banco e ele ficar sem acesso,
+o admin pode reabrir a análise por `kyc_reabrir`.
+
 ### Crédito do empréstimo
 
 Quando o admin marca um pedido como **liberado** em `/admin/pedido/[id]`,
@@ -119,7 +168,7 @@ o valor cai na conta do cliente. A operação é **idempotente**: liberar duas
 vezes não credita em dobro. Se aparecer "credito na conta falhou", rode a
 liberação de novo com segurança.
 
-Confira que os quatro schemas pegaram:
+Confira que os cinco schemas pegaram:
 
 ```sql
 select
@@ -127,8 +176,18 @@ select
   (select count(*) from public.bank_accounts)     as contas,
   (select count(*) from public.bank_cards)        as cartoes,
   (select count(*) from public.bank_limits)       as limites,
-  (select count(*) from public.bank_receipts)     as comprovantes;
+  (select count(*) from public.bank_receipts)     as comprovantes,
+  (select count(*) from public.kyc_submissions)   as kyc;
 ```
+
+Confirme que o bucket do KYC é privado:
+
+```sql
+select id, public, file_size_limit, allowed_mime_types
+from storage.buckets where id = 'kyc';
+```
+
+`public` tem de ser `false`.
 
 ## Passo 3 — Criar o primeiro administrador
 
@@ -201,20 +260,42 @@ Roteiro de teste:
 - [ ] `/admin/usuarios` busca por nome, CPF e telefone
 - [ ] `/esqueci-senha` envia link e o link redefine a senha
 
+- [ ] `/conta/verificacao` percorre as 4 etapas e envia para análise
+- [ ] a câmera pede permissão e recusa captura sem nitidez ou sem luz
+- [ ] a prova de vida só libera após virar a cabeça, sorrir e aproximar
+- [ ] sem KYC aprovado, saque/PIX/transferência/boleto são recusados
+- [ ] **depósito e PIX recebido continuam funcionando** sem KYC
+- [ ] `/admin/kyc` lista a verificação, abre as 9 fotos e aprova
+- [ ] recusar sem justificativa é bloqueado
+- [ ] após aprovar, a saída da conta funciona
+- [ ] `/conta/emprestimo` recusa pedido sem KYC aprovado
+- [ ] `/conta/banco` mostra o aviso de verificação pendente no início
+
 Suítes automatizadas (precisam de `.env.local` real):
 
 ```bash
 npm test                        # 15 testes unitários (mensagens de erro, rótulos)
 node tests/e2e-banco.mjs        # 24 checks: PIX, boleto, crédito, saldo
 node tests/e2e-banco2.mjs       # 49 checks: depósito, saque, recarga, cobrança, limites, DDA
-node tests/e2e-agenda.mjs       # 12 checks: execução e idempotência dos agendamentos
+node tests/e2e-agenda.mjs       # 13 checks: execução e idempotência dos agendamentos
 node tests/e2e-cadastro.mjs     # 17 checks
 node tests/e2e-isolamento.mjs   # 15 checks: um cliente não vê a conta do outro
 node tests/e2e-emprestimo.mjs   # 16 checks
 node tests/e2e-permissoes.mjs   # 10 checks: o que o cliente não pode chamar
-node tests/e2e-banco-prod.mjs   # 24 checks contra o site publicado
-node tests/e2e-banco-paineis.mjs # 28 checks: painéis no SSR e abas no bundle
+node tests/e2e-cartao.mjs       # 13 checks: dados do cartão, PAN derivado e Luhn
+node tests/e2e-menu-admin.mjs   # 16 checks: link de admin só para admin
+node tests/e2e-kyc.mjs          # 50 checks: etapas, upload, bloqueio, aprovação
+node tests/e2e-kyc-bucket.mjs   # 13 checks: isolamento dos arquivos no Storage
+node tests/e2e-kyc-gate.mjs     # 13 checks: entrada liberada, saída barrada
+node tests/e2e-banco-prod.mjs   # 28 checks contra o site publicado
+node tests/e2e-banco-paineis.mjs # 44 checks: painéis no SSR e abas no bundle
+node tests/e2e-kyc-prod.mjs     # 28 checks: KYC no site publicado
 ```
+
+As suítes criam usuários de teste de verdade e os apagam no fim. `e2e-kyc-prod`
+e `e2e-kyc-gate` usam um cliente **próprio** em vez do admin, de propósito: as
+outras suítes aprovam o KYC do admin, e isso faria a tela mostrar "Identidade
+verificada" em vez do formulário.
 
 Para zerar os dados de teste sem apagar a conta:
 
@@ -289,6 +370,9 @@ npx supabase db query --linked -f supabase/_reset.sql
 | E-mail de confirmação não chega | SMTP próprio não configurado, ou caiu no spam |
 | Link de confirmação dá erro | URL fora das Redirect URLs, ou aberto em outro navegador |
 | `/admin` mostra erro de permissão ao aprovar | `supabase/admin.sql` não foi rodado |
+| Cliente não consegue sacar nem enviar PIX | KYC não aprovado — é o comportamento esperado; aprove em `/admin/kyc` |
+| Upload de documento falha | Falta o `Content-Type` correto, ou o arquivo passa de 10 MB / não é jpeg, png, webp ou pdf |
+| "Direct deletion from storage tables is not allowed" | Apague arquivos pela Storage API, nunca por SQL em `storage.objects` |
 | Variável nova não tem efeito na Vercel | mudou depois do build — precisa de redeploy |
 
 ---

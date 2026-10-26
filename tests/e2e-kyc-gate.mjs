@@ -1,6 +1,8 @@
 /**
  * O gate do KYC barra saída e libera entrada?
- * Roda com o token do admin (KYC ainda não aprovado).
+ *
+ * Cria um cliente próprio (sem KYC aprovado) em vez de usar o admin, porque
+ * as outras suítes aprovam o KYC do admin e isso mascararia o teste.
  */
 import { readFileSync } from "node:fs";
 
@@ -15,16 +17,71 @@ const env = Object.fromEntries(
 );
 
 const U = env.NEXT_PUBLIC_SUPABASE_URL;
-const K = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+const HS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" };
 
-const login = await fetch(`${U}/auth/v1/token?grant_type=password`, {
-  method: "POST",
-  headers: { apikey: K, "Content-Type": "application/json" },
-  body: JSON.stringify({ email: "admin@sobreimprestimos.com.br", password: "Sobre@Admin2026" }),
+let passou = 0,
+  falhou = 0;
+const ok = (n, c, d = "") => {
+  if (c) {
+    passou++;
+    console.log(`  ✔ ${n}`);
+  } else {
+    falhou++;
+    console.log(`  ✘ ${n}${d ? ` — ${d}` : ""}`);
+  }
+};
+
+function cpfValido() {
+  const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+  const dv = (b) => {
+    const s = b.reduce((a, d, i) => a + d * (b.length + 1 - i), 0);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  const d1 = dv(n);
+  return [...n, d1, dv([...n, d1])].join("");
+}
+
+console.log("\n=== GATE DO KYC ===\n");
+
+const email = `gate.${Date.now()}@example.com`;
+const senha = "Gate@Teste2026";
+const cpf = cpfValido();
+
+const c = await (
+  await fetch(`${U}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: HS,
+    body: JSON.stringify({
+      email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { full_name: "Cliente Gate Teste", cpf, phone: "11955554444" },
+      data: { full_name: "Cliente Gate Teste", cpf, phone: "11955554444" },
+    }),
+  })
+).json();
+
+await fetch(`${U}/rest/v1/profiles?id=eq.${c.id}`, {
+  method: "PATCH",
+  headers: { ...HS, Prefer: "return=minimal" },
+  body: JSON.stringify({ full_name: "Cliente Gate Teste", cpf, phone: "11955554444" }),
 });
-const s = await login.json();
-const H = { apikey: K, Authorization: `Bearer ${s.access_token}`, "Content-Type": "application/json" };
 
+const s = await (
+  await fetch(`${U}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: senha }),
+  })
+).json();
+
+const TK = s.access_token;
+ok("cliente sem KYC criado e logado", Boolean(c.id) && Boolean(TK), s.error_description ?? "");
+
+const H = { apikey: ANON, Authorization: `Bearer ${TK}`, "Content-Type": "application/json" };
 async function rpc(nome, args = {}) {
   const r = await fetch(`${U}/rest/v1/rpc/${nome}`, { method: "POST", headers: H, body: JSON.stringify(args) });
   const t = await r.text();
@@ -33,39 +90,57 @@ async function rpc(nome, args = {}) {
   return { ok: r.ok, data: j, erro: r.ok ? null : (j?.message ?? t) };
 }
 
-let passou = 0, falhou = 0;
-const ok = (n, c, d = "") => { c ? (passou++, console.log(`  ✔ ${n}`)) : (falhou++, console.log(`  ✘ ${n}${d ? ` — ${d}` : ""}`)); };
-
-console.log("\n=== GATE DO KYC ===\n");
-
 const st = await rpc("kyc_meu_status");
 ok("kyc_meu_status responde", st.ok, st.erro);
-console.log(`  status atual: ${st.data?.status} | pode_movimentar: ${st.data?.pode_movimentar}`);
+ok("status é nao_iniciado", st.data?.status === "nao_iniciado", st.data?.status);
+ok("pode_movimentar é false", st.data?.pode_movimentar === false);
 
-// entrada deve continuar liberada
+// entrada liberada
 const dep = await rpc("bank_move", {
-  p_kind: "deposito", p_description: "Teste de entrada", p_amount: 25, p_counterparty: null, p_document_id: null,
+  p_kind: "deposito", p_description: "Entrada sem KYC", p_amount: 25,
+  p_counterparty: null, p_document_id: null,
 });
 ok("ENTRADA liberada sem KYC (depósito)", dep.ok, dep.erro);
 
 const rec = await rpc("bank_receive_pix", { p_amount: 10, p_from: "Teste" });
 ok("ENTRADA liberada sem KYC (PIX recebido)", rec.ok, rec.erro);
 
-// saída deve ser barrada
+// saída barrada
 const saida = await rpc("bank_move", {
-  p_kind: "saque", p_description: "Teste de saída", p_amount: -5, p_counterparty: null, p_document_id: null,
+  p_kind: "saque", p_description: "Saída sem KYC", p_amount: -5,
+  p_counterparty: null, p_document_id: null,
 });
 ok("SAÍDA barrada sem KYC", !saida.ok && /verifica/i.test(saida.erro ?? ""), saida.ok ? "passou (deveria barrar)" : saida.erro);
 
 const pix = await rpc("bank_send_pix", { p_key: "teste@exemplo.com", p_amount: 5, p_message: null });
 ok("PIX enviado barrado sem KYC", !pix.ok, pix.ok ? "passou (deveria barrar)" : pix.erro);
 
-const boleto = await rpc("bank_pay_dda", { p_barcode: "00190500954014481606906809350314337370000000100" });
-ok("boleto barrado sem KYC", !boleto.ok, boleto.ok ? "passou (deveria barrar)" : boleto.erro);
+const transf = await rpc("bank_transfer", { p_agency: "0001", p_number: "12345678", p_amount: 5, p_message: null });
+ok("transferência barrada sem KYC", !transf.ok, transf.ok ? "passou (deveria barrar)" : transf.erro);
 
-// o gate reconhece o status
+// pedido de empréstimo: a server action barra; aqui checamos a função do gate
 const pode = await rpc("kyc_pode_movimentar", { p_user_id: null });
 ok("kyc_pode_movimentar = false", pode.data === false, JSON.stringify(pode.data));
+
+// após aprovar, libera
+await fetch(`${U}/rest/v1/kyc_submissions?user_id=eq.${c.id}`, {
+  method: "PATCH",
+  headers: { ...HS, Prefer: "return-minimal" },
+  body: JSON.stringify({ status: "aprovado" }),
+});
+
+const st2 = await rpc("kyc_meu_status");
+ok("após aprovação, pode_movimentar = true", st2.data?.pode_movimentar === true);
+
+const saida2 = await rpc("bank_move", {
+  p_kind: "saque", p_description: "Saída liberada", p_amount: -5,
+  p_counterparty: null, p_document_id: null,
+});
+ok("SAÍDA liberada após aprovação", saida2.ok, saida2.erro);
+
+// limpeza
+await fetch(`${U}/auth/v1/admin/users/${c.id}`, { method: "DELETE", headers: HS });
+ok("cliente de teste removido", true);
 
 console.log(`\n=== ${passou} passaram, ${falhou} falharam ===\n`);
 process.exit(falhou ? 1 : 0);

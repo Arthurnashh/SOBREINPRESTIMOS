@@ -19,6 +19,31 @@ const env = Object.fromEntries(
 
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+
+/**
+ * Movimentar dinheiro exige identidade verificada desde o KYC.
+ * Aprova a verificação do titular antes dos testes de saída.
+ */
+async function aprovarKyc() {
+  if (!SERVICE) return;
+  const u = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1`, {
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
+  }).then((r) => r.json());
+  const id = u?.[0]?.id;
+  if (!id) return;
+
+  await fetch(`${SUPABASE_URL}/rest/v1/kyc_submissions?user_id=eq.${id}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ status: "aprovado" }),
+  });
+}
 
 let cookies = "";
 // As funcoes sao SECURITY DEFINER e chamam auth.uid(): precisam do token do
@@ -67,6 +92,7 @@ function checar(nome, ok, detalhe = "") {
   const j = await res.json();
   checar("login no Supabase", res.ok && !!j.access_token, j.error_description ?? "");
   userToken = j.access_token ?? "";
+  await aprovarKyc();
 
   const ref = SUPABASE_URL.replace("https://", "").split(".")[0];
   const nome = `sb-${ref}-auth-token`;

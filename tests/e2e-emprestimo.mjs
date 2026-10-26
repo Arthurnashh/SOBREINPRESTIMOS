@@ -193,6 +193,19 @@ let pedidoId = "";
 
 // -------------------------------------- 7. o lead gasta o dinheiro liberado
 {
+  // Desde o KYC, gastar exige identidade aprovada. Aprova direto no banco,
+  // como o painel admin faz — o crédito em si já entrou sem KYC.
+  await fetch(`${URL_}/rest/v1/kyc_submissions?user_id=eq.${novoId}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ status: "aprovado" }),
+  });
+
   const r = await rpc(token, "bank_send_pix", {
     p_key: "loja@teste-emprestimo.com.br",
     p_amount: 1200,

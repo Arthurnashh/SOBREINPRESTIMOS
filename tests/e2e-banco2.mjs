@@ -54,6 +54,24 @@ if (!login.ok) {
 const sessao = await login.json();
 const TOKEN = sessao.access_token;
 
+// Movimentar exige identidade aprovada desde o KYC. Aprova o titular antes
+// dos testes de saída (saque, recarga, agendamento).
+{
+  const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+  const HS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+  const perfis = await fetch(`${URL_BASE}/rest/v1/profiles?select=id&limit=1`, {
+    headers: HS,
+  }).then((r) => r.json());
+  const uid = perfis?.[0]?.id;
+  if (uid) {
+    await fetch(`${URL_BASE}/rest/v1/kyc_submissions?user_id=eq.${uid}`, {
+      method: "PATCH",
+      headers: { ...HS, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "aprovado" }),
+    });
+  }
+}
+
 async function rpc(nome, args = {}) {
   const r = await fetch(`${URL_BASE}/rest/v1/rpc/${nome}`, {
     method: "POST",
