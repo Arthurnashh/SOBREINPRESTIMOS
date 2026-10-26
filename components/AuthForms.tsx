@@ -69,21 +69,14 @@ export function SignUpForm({ intent }: { intent?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(signUp, undefined);
   const f = state?.fields ?? {};
 
-  if (state?.message) {
-    return (
-      <div className="card stack">
-        <h1>Confira seu e-mail</h1>
-        <Feedback state={state} />
-        <p className="muted">Depois de confirmar, você já pode enviar seu pedido de empréstimo.</p>
-      </div>
-    );
-  }
-
   return (
     <form action={action} className="card stack">
       <div>
         <h1>Abra sua conta</h1>
-        <p className="muted">Gratuito e sem nenhuma cobrança para pedir crédito.</p>
+        <p className="muted">
+          Gratuito e sem nenhuma cobrança. Na sequência você confirma seus documentos e sua
+          identidade — leva poucos minutos.
+        </p>
       </div>
       <Feedback state={state} />
       {intent && <input type="hidden" name="intent" value={intent} />}

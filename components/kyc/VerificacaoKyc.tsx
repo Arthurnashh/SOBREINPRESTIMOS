@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition, type ReactNode } from "react";
 import {
   salvarDadosKyc,
@@ -27,7 +28,14 @@ import { IconeEscudo, IconeCartao, IconePerfil, IconeCadeado, IconeInicio } from
 
 type Etapa = 1 | 2 | 3 | 4;
 
-export default function VerificacaoKyc({ inicial }: { inicial: KycSubmission }) {
+export default function VerificacaoKyc({
+  inicial,
+  depois,
+}: {
+  inicial: KycSubmission;
+  /** Para onde ir quando a verificação terminar (vem do cadastro). */
+  depois?: string;
+}) {
   const [k, setK] = useState<KycSubmission>(inicial);
   const [etapa, setEtapa] = useState<Etapa>(
     inicial.status === "aprovado" || inicial.status === "em_analise" ? 4 : 1
@@ -115,6 +123,9 @@ export default function VerificacaoKyc({ inicial }: { inicial: KycSubmission }) 
               </span>
             </div>
           </div>
+          <Link href={depois ?? "/conta/banco"} className="btn btn-primary btn-block">
+            {depois ? "Continuar para o pedido" : "Ir para a minha conta"}
+          </Link>
         </div>
       </div>
     );
@@ -139,6 +150,9 @@ export default function VerificacaoKyc({ inicial }: { inicial: KycSubmission }) 
               </span>
             </div>
           </div>
+          <Link href="/conta/banco" className="btn btn-primary btn-block">
+            Ver minha conta
+          </Link>
         </div>
       </div>
     );

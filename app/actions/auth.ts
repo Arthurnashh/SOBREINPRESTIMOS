@@ -48,19 +48,19 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
   if (password.length < 8) return { error: "A senha precisa ter pelo menos 8 caracteres.", fields };
   if (!terms) return { error: "É preciso aceitar os termos e a política de privacidade.", fields };
 
+  // A verificação de identidade faz parte de abrir a conta: quem se cadastra
+  // cai direto nela, sem passar pelo e-mail. O destino final (o pedido de
+  // empréstimo, quando veio da simulação) é lembrado para depois.
   const intent = String(formData.get("intent") ?? "");
-  const afterSignup = /^valor=\d+&parcelas=\d+$/.test(intent)
+  const destino = /^valor=\d+&parcelas=\d+$/.test(intent)
     ? `/conta/emprestimo?${intent}`
     : "/conta";
-
-  const origin = await siteOrigin();
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(afterSignup)}`,
       data: { full_name: fullName, cpf, phone },
     },
   });
@@ -75,11 +75,17 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
     return { error: "Não foi possível concluir o cadastro. Tente novamente.", fields };
   }
 
-  if (data.session) redirect(afterSignup);
+  // Sem confirmação de e-mail o cadastro já devolve sessão. Se por alguma
+  // configuração do projeto ela não vier, mandamos entrar em vez de fingir
+  // que deu certo.
+  if (!data.session) {
+    return {
+      error:
+        "Sua conta foi criada, mas o acesso automático está indisponível. Entre com seu e-mail e senha.",
+    };
+  }
 
-  return {
-    message: `Enviamos um link de confirmação para ${email}. Abra o e-mail para ativar sua conta.`,
-  };
+  redirect(`/conta/verificacao?depois=${encodeURIComponent(destino)}`);
 }
 
 export async function signOut() {
