@@ -181,8 +181,20 @@ export function mensagemKyc(msg: string): string {
   if (m.includes("número do documento")) return "Informe o número do documento.";
   if (m.includes("órgão emissor")) return "Informe o órgão emissor.";
 
-  if (m.includes("verificação de identidade pendente"))
+  // A mensagem do banco muda conforme a operação recusada; o texto ao cliente
+  // deve dizer o que fazer, não repetir o jargão.
+  if (m.includes("verificação de identidade pendente")) {
+    if (m.includes("agendar")) {
+      return "Conclua sua verificação de identidade para agendar pagamentos.";
+    }
+    if (m.includes("empréstimo") || m.includes("emprestimo")) {
+      return "Conclua sua verificação de identidade para pedir empréstimo.";
+    }
     return "Conclua sua verificação de identidade para movimentar a conta.";
+  }
+
+  if (m.includes("row-level security"))
+    return "Conclua sua verificação de identidade para continuar.";
 
   return "Não foi possível concluir. Tente novamente.";
 }

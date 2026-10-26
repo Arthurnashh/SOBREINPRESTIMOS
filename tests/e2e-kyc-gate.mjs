@@ -118,6 +118,20 @@ ok("PIX enviado barrado sem KYC", !pix.ok, pix.ok ? "passou (deveria barrar)" : 
 const transf = await rpc("bank_transfer", { p_agency: "0001", p_number: "12345678", p_amount: 5, p_message: null });
 ok("transferência barrada sem KYC", !transf.ok, transf.ok ? "passou (deveria barrar)" : transf.erro);
 
+// O agendamento é um SEGUNDO caminho de saída: o cron chama bank_move_for
+// depois. Se este ponto não estiver travado, o cliente agenda hoje e o
+// dinheiro sai amanhã, driblando o gate de bank_move.
+const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+const ag = await rpc("bank_schedule", {
+  p_kind: "pix", p_target: "destino@exemplo.com", p_amount: 5,
+  p_runs_on: amanha, p_message: null,
+});
+ok("agendamento barrado sem KYC", !ag.ok && /verifica/i.test(ag.erro ?? ""), ag.ok ? "passou (deveria barrar)" : ag.erro);
+
+// e a fila do cron também recusa, para agendamentos criados antes da regra
+const fila = await rpc("bank_run_schedules");
+ok("cron não executa a fila sem autorização", !fila.ok, fila.ok ? "executou" : "restrito ao service_role");
+
 // pedido de empréstimo: a server action barra; aqui checamos a função do gate
 const pode = await rpc("kyc_pode_movimentar", { p_user_id: null });
 ok("kyc_pode_movimentar = false", pode.data === false, JSON.stringify(pode.data));
@@ -131,6 +145,12 @@ await fetch(`${U}/rest/v1/kyc_submissions?user_id=eq.${c.id}`, {
 
 const st2 = await rpc("kyc_meu_status");
 ok("após aprovação, pode_movimentar = true", st2.data?.pode_movimentar === true);
+
+const ag2 = await rpc("bank_schedule", {
+  p_kind: "pix", p_target: "destino@exemplo.com", p_amount: 5,
+  p_runs_on: new Date().toISOString().slice(0, 10), p_message: null,
+});
+ok("agendamento liberado após aprovação", ag2.ok, ag2.erro);
 
 const saida2 = await rpc("bank_move", {
   p_kind: "saque", p_description: "Saída liberada", p_amount: -5,

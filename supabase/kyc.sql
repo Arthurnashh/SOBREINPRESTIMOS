@@ -833,6 +833,141 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------
+-- 7b. GATE nos agendamentos
+--
+-- `bank_move` é o caminho direto, mas o dinheiro também sai por um segundo
+-- caminho: o cliente agenda ('bank_schedule', liberada para authenticated) e
+-- o cron chama `bank_move_for` depois. Sem gate nos dois pontos, um cliente
+-- sem KYC agenda hoje e o dinheiro sai amanhã, sem passar por `bank_move`.
+-- ---------------------------------------------------------------------
+
+/** Não deixa agendar sem verificação aprovada. */
+create or replace function public.bank_schedule(
+  p_kind text,
+  p_target text,
+  p_amount numeric,
+  p_runs_on date,
+  p_message text default null
+)
+returns public.bank_schedules
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  sc  public.bank_schedules;
+  acct public.bank_accounts;
+begin
+  if uid is null then raise exception 'não autenticado'; end if;
+  if p_kind not in ('pix','transferencia','boleto') then raise exception 'tipo de agendamento inválido'; end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'valor inválido'; end if;
+  if length(trim(coalesce(p_target, ''))) < 4 then raise exception 'destino inválido'; end if;
+  if p_runs_on is null then raise exception 'informe a data'; end if;
+  if p_runs_on < current_date then raise exception 'a data não pode estar no passado'; end if;
+  if p_runs_on > current_date + interval '365 days' then raise exception 'agendamento máximo de um ano'; end if;
+
+  if not public.kyc_pode_movimentar(uid) then
+    raise exception 'verificação de identidade pendente: conclua sua verificação para agendar';
+  end if;
+
+  select * into acct from public.bank_accounts where user_id = uid;
+  if not found then raise exception 'conta não encontrada'; end if;
+  if acct.balance < p_amount then raise exception 'saldo insuficiente para agendar'; end if;
+
+  insert into public.bank_schedules (user_id, kind, target, amount, message, runs_on)
+  values (uid, p_kind, left(trim(p_target), 120), p_amount, left(p_message, 140), p_runs_on)
+  returning * into sc;
+
+  return sc;
+end;
+$$;
+
+grant execute on function public.bank_schedule(text, text, numeric, date, text) to authenticated;
+
+/**
+ * Rede de segurança na execução da fila. Um agendamento criado antes desta
+ * regra existir ainda estaria 'agendado'; aqui ele não executa e vira
+ * 'falhou', em vez de debitar uma conta sem verificação.
+ *
+ * Só barra SAÍDA: crédito de empréstimo e estorno seguem liberados.
+ */
+create or replace function public.bank_run_schedules()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  sc  public.bank_schedules;
+  tx  public.bank_transactions;
+  n   int := 0;
+  v_avail numeric;
+begin
+  for sc in
+    select * from public.bank_schedules
+     where status = 'agendado' and runs_on <= current_date
+     order by runs_on asc
+     for update skip locked
+  loop
+    begin
+      if not public.kyc_pode_movimentar(sc.user_id) then
+        update public.bank_schedules set status = 'falhou' where id = sc.id;
+        continue;
+      end if;
+
+      select balance + overdraft into v_avail from public.bank_accounts where user_id = sc.user_id;
+      if v_avail is null or v_avail < sc.amount then
+        update public.bank_schedules set status = 'falhou' where id = sc.id;
+        continue;
+      end if;
+
+      tx := public.bank_move_for(sc.user_id, 'agendamento',
+        'Agendamento · ' || upper(sc.kind) || ' · ' || sc.target,
+        -sc.amount, sc.target, sc.id::text);
+
+      perform public.bank_receipt_add(sc.user_id, tx.id, 'agendamento',
+        'Comprovante de agendamento',
+        jsonb_build_object('amount', sc.amount, 'kind', sc.kind, 'target', sc.target, 'runs_on', sc.runs_on));
+
+      update public.bank_schedules
+         set status = 'executado', executed_at = now(), transaction_id = tx.id
+       where id = sc.id;
+      n := n + 1;
+    exception when others then
+      update public.bank_schedules set status = 'falhou' where id = sc.id;
+    end;
+  end loop;
+
+  return n;
+end;
+$$;
+
+revoke all on function public.bank_run_schedules() from public, anon, authenticated;
+grant execute on function public.bank_run_schedules() to service_role;
+
+-- ---------------------------------------------------------------------
+-- 7c. GATE no pedido de empréstimo
+--
+-- A server action já checa o KYC, mas isso é uma trava de aplicação: o
+-- cliente tem `grant insert (amount, installments)` na tabela e pode chamar
+-- a API REST direto, driblando a action. A regra tem de viver no banco,
+-- como acontece com `bank_move`.
+--
+-- A policy antiga só exigia `auth.uid() = user_id and status = 'em_analise'`.
+-- Aqui ela passa a exigir também a verificação aprovada.
+-- ---------------------------------------------------------------------
+
+drop policy if exists "pedido: criar o próprio" on public.loan_requests;
+create policy "pedido: criar o próprio"
+  on public.loan_requests for insert
+  with check (
+    auth.uid() = user_id
+    and status = 'em_analise'
+    and public.kyc_pode_movimentar(auth.uid())
+  );
+
+-- ---------------------------------------------------------------------
 -- 8. PERMISSÕES
 -- ---------------------------------------------------------------------
 revoke all on function public.kyc_meu_status() from public, anon;

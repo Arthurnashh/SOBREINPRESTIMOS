@@ -123,6 +123,20 @@ travar entrada só prenderia o cliente. O que exige aprovação é a **saída**:
 PIX enviado, transferência, boleto, saque, recarga, agendamento, débito
 automático e tarifa.
 
+> **O gate existe em quatro pontos, e todos são necessários.** A saída direta
+> passa por `bank_move`. O agendamento passa por `bank_schedule` na criação e
+> por `bank_run_schedules` na execução — este último porque a fila roda com
+> `service_role` e chama `bank_move_for`, que **não** tem gate próprio (é a
+> mesma função que credita empréstimo e estorno, que devem passar). Proteger
+> só `bank_move` deixaria o cliente agendar hoje sem verificação e o dinheiro
+> sair amanhã pelo cron.
+>
+> O quarto é a **policy de insert de `loan_requests`**. A server action checa o
+> KYC, mas isso sozinho não basta: o cliente tem `grant insert (amount,
+> installments)` na tabela e pode chamar a API REST direto. Sem a condição na
+> policy, `POST /rest/v1/loan_requests` com o token do próprio cliente criava o
+> pedido mesmo sem verificação. A regra tem de viver no banco.
+
 | Tabela | Guarda |
 |---|---|
 | `kyc_submissions` | um registro por pessoa: dados, endereço, documento, comprovante, caminhos das fotos, biometria e a decisão |
@@ -264,6 +278,7 @@ Roteiro de teste:
 - [ ] a câmera pede permissão e recusa captura sem nitidez ou sem luz
 - [ ] a prova de vida só libera após virar a cabeça, sorrir e aproximar
 - [ ] sem KYC aprovado, saque/PIX/transferência/boleto são recusados
+- [ ] sem KYC aprovado, **agendar** também é recusado
 - [ ] **depósito e PIX recebido continuam funcionando** sem KYC
 - [ ] `/admin/kyc` lista a verificação, abre as 9 fotos e aprova
 - [ ] recusar sem justificativa é bloqueado
@@ -274,7 +289,7 @@ Roteiro de teste:
 Suítes automatizadas (precisam de `.env.local` real):
 
 ```bash
-npm test                        # 15 testes unitários (mensagens de erro, rótulos)
+npm test                        # 25 testes unitários (mensagens de erro, rótulos, ângulos)
 node tests/e2e-banco.mjs        # 24 checks: PIX, boleto, crédito, saldo
 node tests/e2e-banco2.mjs       # 49 checks: depósito, saque, recarga, cobrança, limites, DDA
 node tests/e2e-agenda.mjs       # 13 checks: execução e idempotência dos agendamentos
@@ -286,7 +301,9 @@ node tests/e2e-cartao.mjs       # 13 checks: dados do cartão, PAN derivado e Lu
 node tests/e2e-menu-admin.mjs   # 16 checks: link de admin só para admin
 node tests/e2e-kyc.mjs          # 50 checks: etapas, upload, bloqueio, aprovação
 node tests/e2e-kyc-bucket.mjs   # 13 checks: isolamento dos arquivos no Storage
-node tests/e2e-kyc-gate.mjs     # 13 checks: entrada liberada, saída barrada
+node tests/e2e-kyc-gate.mjs     # 16 checks: entrada liberada, saída barrada
+node tests/e2e-kyc-cron.mjs     # 11 checks: o cron não debita conta sem KYC
+node tests/e2e-kyc-emprestimo.mjs # 11 checks: empréstimo barrado no banco (RLS) e na action
 node tests/e2e-banco-prod.mjs   # 28 checks contra o site publicado
 node tests/e2e-banco-paineis.mjs # 44 checks: painéis no SSR e abas no bundle
 node tests/e2e-kyc-prod.mjs     # 28 checks: KYC no site publicado
