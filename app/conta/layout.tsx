@@ -7,6 +7,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ContaLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireSession();
+
+  // Só entra no menu quem é admin de fato (is_admin = true no banco).
+  // A rota /admin tem a própria checagem em requireAdmin(), então esconder
+  // o link é a primeira camada, não a única.
+  const ehAdmin = profile?.is_admin === true;
+
   return (
     <>
       <header className="header">
@@ -22,7 +28,7 @@ export default async function ContaLayout({ children }: { children: React.ReactN
           <Link href="/conta">Início</Link>
           <Link href="/conta/banco">Conta bancária</Link>
           <Link href="/conta/emprestimo">Empréstimo</Link>
-          {profile?.is_admin && <Link href="/admin">Administração</Link>}
+          {ehAdmin ? <Link href="/admin">Administração</Link> : null}
           <form action={signOut}>
             <button className="link-btn">Sair</button>
           </form>
