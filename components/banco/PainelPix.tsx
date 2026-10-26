@@ -2,7 +2,7 @@ import { removerChavePix } from "@/app/actions/banco";
 import { brl, date } from "@/lib/format";
 import FormChavePix from "./FormChavePix";
 import Operacoes from "./Operacoes";
-import { IconePix } from "./Icones";
+import { IconePix } from "../Icones";
 import type { PixKey, PixCharge } from "@/lib/banking";
 
 const TIPO_CHAVE: Record<string, string> = {

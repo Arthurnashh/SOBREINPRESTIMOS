@@ -24,6 +24,15 @@ export async function requestLoan(_prev: LoanFormState, formData: FormData): Pro
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?next=/conta/emprestimo");
 
+  // Crédito só para identidade verificada — mesma regra da conta bancária.
+  const { data: podeMovimentar } = await supabase.rpc("kyc_pode_movimentar", { p_user_id: null });
+  if (podeMovimentar !== true) {
+    return {
+      error:
+        "Conclua sua verificação de identidade para pedir empréstimo. Leva poucos minutos em Minha verificação.",
+    };
+  }
+
   const { error } = await supabase.from("loan_requests").insert({ amount, installments });
 
   if (error) {

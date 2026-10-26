@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { brl, date } from "@/lib/format";
 import { KIND_LABEL, type Account, type Summary, type Transaction } from "@/lib/banking";
+import type { KycStatus } from "@/lib/kyc";
+import { IconeEscudo } from "../Icones";
 
 function iniciais(nome: string) {
   const partes = nome.trim().split(/\s+/);
@@ -13,14 +15,38 @@ export default function PainelInicio({
   extrato,
   nome,
   mes,
+  kycStatus,
 }: {
   resumo: Summary;
   extrato: Transaction[];
   nome: string;
   mes: string;
+  kycStatus?: KycStatus;
 }) {
+  const bloqueado = kycStatus !== undefined && kycStatus !== "aprovado";
+
   return (
     <div className="stack" style={{ ["--gap" as string]: "16px" }}>
+      {bloqueado && (
+        <div className="kyc-bloqueio">
+          <IconeEscudo size={20} />
+          <span>
+            <strong>Sua conta ainda não pode movimentar.</strong> Você já pode receber depósitos e
+            PIX, mas para enviar, pagar boleto, sacar ou pedir empréstimo é preciso concluir a
+            verificação de identidade.{" "}
+            <Link href="/conta/verificacao">
+              {kycStatus === "nao_iniciado"
+                ? "Começar verificação"
+                : kycStatus === "recusado"
+                  ? "Corrigir e reenviar"
+                  : kycStatus === "pendente"
+                    ? "Ver o que ajustar"
+                    : "Acompanhar a análise"}
+            </Link>
+          </span>
+        </div>
+      )}
+
       <section className="bank-secao">
         <header>
           <h2>Movimentação em {mes}</h2>

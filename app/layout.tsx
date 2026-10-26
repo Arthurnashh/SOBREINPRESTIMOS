@@ -3,6 +3,7 @@ import { COMPANY } from "@/lib/config";
 import CookieNotice from "@/components/CookieNotice";
 import "./globals.css";
 import "./banco.css";
+import "./kyc.css";
 
 export const metadata: Metadata = {
   title: `${COMPANY.name} — Empréstimo pessoal sem taxa antecipada`,

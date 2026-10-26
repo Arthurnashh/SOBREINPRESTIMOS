@@ -12,7 +12,7 @@ import {
   IconeCopiar,
   IconeOlho,
   IconeOlhoFechado,
-} from "./Icones";
+} from "../Icones";
 
 /** Painel "Meus cartões": ver dados, copiar, bloquear. */
 export default function PainelCartoes({

@@ -1,0 +1,587 @@
+/* =====================================================================
+   KYC — verificação de identidade
+   Paleta da marca, mesma linguagem visual da conta bancária.
+   ===================================================================== */
+
+.kyc-shell {
+  --kyc-line: #d8e6de;
+  --kyc-soft: #eef4f0;
+  display: grid;
+  gap: 20px;
+}
+
+/* ----------------------------- cabeçalho ----------------------------- */
+.kyc-topo {
+  background: #fff;
+  border: 1px solid var(--kyc-line);
+  border-radius: 22px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.kyc-topo h1 {
+  font-size: 24px;
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-topo p {
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+/* --------------------------- trilha de etapas ------------------------ */
+.kyc-trilha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kyc-etapa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--kyc-line);
+  background: #fff;
+  font: 600 13px var(--body);
+  color: var(--muted);
+}
+
+.kyc-etapa .num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--kyc-soft);
+  color: var(--brand, #0e5a43);
+  font-size: 12px;
+}
+
+.kyc-etapa.atual {
+  border-color: var(--brand, #0e5a43);
+  background: var(--kyc-soft);
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-etapa.atual .num {
+  background: var(--brand, #0e5a43);
+  color: #fff;
+}
+
+.kyc-etapa.pronta {
+  color: #145c34;
+  border-color: #b7e0c8;
+  background: #eefaf3;
+}
+
+.kyc-etapa.pronta .num {
+  background: #b7e0c8;
+  color: #0f4a28;
+}
+
+/* ------------------------------- cartão ------------------------------ */
+.kyc-bloco {
+  background: #fff;
+  border: 1px solid var(--kyc-line);
+  border-radius: 22px;
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.kyc-bloco > header h2 {
+  font-size: 19px;
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-bloco > header p {
+  color: var(--muted);
+  font-size: 13.5px;
+  margin-top: 5px;
+}
+
+.kyc-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+/* campos */
+.kyc-campo {
+  display: grid;
+  gap: 6px;
+}
+
+.kyc-campo label {
+  font: 600 12.5px var(--body);
+  color: #4a5c53;
+}
+
+.kyc-campo input,
+.kyc-campo select {
+  border: 1px solid var(--kyc-line);
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 14.5px;
+  background: #fff;
+  width: 100%;
+}
+
+.kyc-campo input:focus,
+.kyc-campo select:focus {
+  outline: 2px solid var(--brand, #0e5a43);
+  outline-offset: 1px;
+}
+
+.kyc-campo.pequeno { max-width: 120px; }
+
+/* ------------------------------ câmera ------------------------------- */
+.kyc-camera {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  max-width: 460px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.kyc-camera-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.kyc-passo {
+  font: 700 12px var(--body);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.kyc-angulo {
+  font: 700 15px var(--body);
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-video-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #0a1611;
+}
+
+.kyc-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* espelho: mais natural para quem se vê */
+}
+
+/* máscara oval: mostra onde o rosto deve ficar */
+.kyc-mascara {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 26px;
+  box-shadow: 0 0 0 2000px rgba(6, 26, 18, 0.55);
+  transition: box-shadow .2s ease;
+}
+
+.kyc-mascara::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 62%;
+  height: 74%;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  transition: border-color .2s ease;
+}
+
+.kyc-mascara.ok::after { border-color: #4ade80; }
+.kyc-mascara.ruim::after { border-color: #fbbf24; }
+
+.kyc-dica {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  background: rgba(6, 26, 18, 0.82);
+  color: #fff;
+  font: 600 12.5px var(--body);
+  padding: 7px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kyc-dica.ok { background: rgba(11, 92, 46, 0.9); }
+.kyc-dica.ruim { background: rgba(146, 64, 14, 0.92); }
+
+.kyc-instrucao {
+  text-align: center;
+  color: var(--brand-deep, #0a3d2c);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+/* medidores */
+.kyc-medidores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.kyc-medidor {
+  display: grid;
+  gap: 6px;
+}
+
+.kyc-medidor .rot {
+  font: 600 11.5px var(--body);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.kyc-medidor .barra {
+  height: 6px;
+  border-radius: 999px;
+  background: #e6efe9;
+  overflow: hidden;
+}
+
+.kyc-medidor .preenche {
+  display: block;
+  height: 100%;
+  background: #cbd8d1;
+  border-radius: 999px;
+  transition: width .18s ease, background .18s ease;
+}
+
+.kyc-medidor .preenche.bom { background: #1a9e5f; }
+
+.kyc-prova {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--kyc-soft);
+  color: var(--brand-deep, #0a3d2c);
+  border-radius: 14px;
+  padding: 11px 15px;
+  font: 600 13px var(--body);
+  width: 100%;
+}
+
+/* bolinhas de progresso */
+.kyc-bolinhas {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.kyc-bolinha {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d3e0d8;
+  transition: transform .15s ease, background .15s ease;
+}
+
+.kyc-bolinha.feito { background: #1a9e5f; }
+.kyc-bolinha.atual { background: var(--brand, #0e5a43); transform: scale(1.35); }
+
+.kyc-btn { width: 100%; justify-content: center; }
+
+.kyc-privacidade {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  justify-content: center;
+}
+
+/* ------------------------------ uploads ------------------------------ */
+.kyc-upload {
+  border: 1px dashed var(--kyc-line);
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  background: #fcfefd;
+}
+
+.kyc-upload.feito {
+  border-style: solid;
+  border-color: #b7e0c8;
+  background: #f6fdf9;
+}
+
+.kyc-upload-topo strong {
+  display: block;
+  font-size: 15px;
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-upload-topo .fine { margin-top: 4px; }
+
+.kyc-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kyc-upload-icone {
+  width: 66px;
+  height: 66px;
+  border-radius: 16px;
+  background: var(--kyc-soft);
+  color: var(--brand, #0e5a43);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.kyc-previa {
+  width: 96px;
+  height: 66px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--kyc-line);
+  flex: none;
+}
+
+.kyc-upload-acoes {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.kyc-escolha { display: grid; gap: 9px; }
+
+.kyc-escolha .rot {
+  font: 600 12.5px var(--body);
+  color: #4a5c53;
+}
+
+.kyc-opcoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ------------------------------ conclusão ---------------------------- */
+.kyc-resumo {
+  display: grid;
+  gap: 2px;
+}
+
+.kyc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid #eef3f0;
+}
+
+.kyc-item:last-child { border-bottom: 0; }
+
+.kyc-item .quem {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.kyc-item .det {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 3px;
+}
+
+.kyc-status-grande {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--kyc-soft);
+}
+
+.kyc-status-grande .glifo {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--brand, #0e5a43);
+  flex: none;
+}
+
+.kyc-status-grande.aprovado { background: #eefaf3; }
+.kyc-status-grande.recusado { background: #fdf3f2; }
+.kyc-status-grande.em_analise { background: #fff8e8; }
+
+.kyc-status-grande strong {
+  display: block;
+  font-size: 16px;
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-status-grande span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ------------------------------- admin ------------------------------- */
+.kyc-fila {
+  display: grid;
+  gap: 12px;
+}
+
+.kyc-fila-item {
+  border: 1px solid var(--kyc-line);
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  background: #fff;
+}
+
+.kyc-fila-item > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kyc-fila-item .nome {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.kyc-fila-item .meta {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 3px;
+}
+
+.kyc-fotos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.kyc-foto {
+  border: 1px solid var(--kyc-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f7faf8;
+  display: grid;
+  gap: 0;
+}
+
+.kyc-foto .legenda {
+  font: 600 11.5px var(--body);
+  color: var(--muted);
+  padding: 6px 9px;
+  background: #fff;
+  border-top: 1px solid var(--kyc-line);
+}
+
+.kyc-foto img,
+.kyc-foto .sem-foto {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.kyc-decisao {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.kyc-decisao textarea {
+  border: 1px solid var(--kyc-line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: 14px var(--body);
+  min-height: 44px;
+  resize: vertical;
+  flex: 1 1 240px;
+}
+
+.kyc-contadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.kyc-contador {
+  background: #fff;
+  border: 1px solid var(--kyc-line);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.kyc-contador b {
+  display: block;
+  font: 700 26px var(--display);
+  color: var(--brand-deep, #0a3d2c);
+}
+
+.kyc-contador span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* bloqueio de conta */
+.kyc-bloqueio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff8e8;
+  border: 1px solid #f0dfae;
+  border-radius: 16px;
+  padding: 15px 18px;
+  color: #6b4a00;
+  font-size: 13.5px;
+}
+
+.kyc-bloqueio a {
+  color: #6b4a00;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+@media (max-width: 880px) {
+  .kyc-topo,
+  .kyc-bloco { padding: 18px 16px; }
+  .kyc-medidores { grid-template-columns: 1fr; }
+  .kyc-trilha { gap: 6px; }
+  .kyc-etapa { padding: 7px 11px; font-size: 12px; }
+  .kyc-fotos { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+}

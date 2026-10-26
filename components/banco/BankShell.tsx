@@ -11,7 +11,7 @@ import {
   IconeExtrato,
   IconeOlho,
   IconeOlhoFechado,
-} from "./Icones";
+} from "../Icones";
 
 type Aba = "inicio" | "pix" | "cartoes" | "extrato" | "perfil" | "config";
 

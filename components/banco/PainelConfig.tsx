@@ -1,6 +1,6 @@
 import FormLimites from "./FormLimites";
 import { WITHDRAW_LABEL } from "@/lib/banking";
-import { IconeCartao, IconeEscudo, IconePerfil } from "./Icones";
+import { IconeCartao, IconeEscudo, IconePerfil } from "../Icones";
 import type { Account, Card, Limits, Withdrawal } from "@/lib/banking";
 
 const GRADE_SEGURANCA = [

@@ -18,7 +18,7 @@ import {
   IconeBoleto,
   IconeRecarga,
   IconeAgendar,
-} from "./Icones";
+} from "../Icones";
 
 type Aba =
   | "pix"
