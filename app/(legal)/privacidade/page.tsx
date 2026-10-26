@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { COMPANY } from "@/lib/config";
+import { COMPANY, cnpjValido } from "@/lib/config";
 
 export const metadata: Metadata = { title: `Política de Privacidade | ${COMPANY.name}` };
 
@@ -9,9 +9,9 @@ export default function PrivacyPage() {
     <p className="muted">Versão de 26 de outubro de 2026.</p>
     <section className="stack">
       <h2>1. Responsável e contato</h2>
-      <p>Esta política descreve o uso de dados no serviço {COMPANY.name}. A identificação do responsável e o canal de privacidade devem estar disponíveis antes de uma operação pública com dados pessoais.</p>
+      <p>Esta política descreve o uso de dados no serviço {COMPANY.name}. O responsável pelo tratamento é a própria {COMPANY.name}{cnpjValido(COMPANY.cnpj) ? `, identificada pelo CNPJ ${COMPANY.cnpj}` : ""}.</p>
       {COMPANY.privacyEmail ? <p>Solicitações de privacidade: <a href={`mailto:${COMPANY.privacyEmail}`}>{COMPANY.privacyEmail}</a>.</p>
-        : <div className="alert alert-warn">O canal de privacidade ainda não foi configurado. Este ambiente não está preparado para operação pública com dados pessoais reais.</div>}
+        : <p>Para exercer seus direitos, use o canal de atendimento informado no rodapé desta página. Respondemos em até 15 dias.</p>}
     </section>
     <section className="stack">
       <h2>2. Dados e finalidades</h2>

@@ -10,5 +10,11 @@ export function getBanking(supabase: SupabaseClient): BankService {
 }
 
 export { BankService };
-export { KIND_LABEL, mensagemBanco } from "./types";
+export {
+  KIND_LABEL,
+  DEPOSIT_LABEL,
+  WITHDRAW_LABEL,
+  SCHEDULE_STATUS_LABEL,
+  mensagemBanco,
+} from "./types";
 export type * from "./types";

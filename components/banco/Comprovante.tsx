@@ -7,6 +7,11 @@ const TITULO: Record<Dados["tipo"], string> = {
   pix: "Comprovante de PIX",
   transferencia: "Comprovante de transferência",
   boleto: "Comprovante de pagamento",
+  deposito: "Comprovante de depósito",
+  saque: "Comprovante de saque",
+  recarga: "Comprovante de recarga",
+  agendamento: "Comprovante de agendamento",
+  cobranca: "Cobrança PIX gerada",
 };
 
 export default function Comprovante({ dados }: { dados: Dados }) {
@@ -31,10 +36,16 @@ export default function Comprovante({ dados }: { dados: Dados }) {
         </div>
         {dados.descricao && (
           <div>
-            <dt>Mensagem</dt>
+            <dt>{dados.tipo === "cobranca" ? "Descrição" : "Mensagem"}</dt>
             <dd>{dados.descricao}</dd>
           </div>
         )}
+        {(dados.extra ?? []).map((e) => (
+          <div key={e.rotulo}>
+            <dt>{e.rotulo}</dt>
+            <dd style={{ wordBreak: "break-all" }}>{e.valor}</dd>
+          </div>
+        ))}
         <div>
           <dt>Identificador</dt>
           <dd style={{ wordBreak: "break-all" }}>{dados.id}</dd>

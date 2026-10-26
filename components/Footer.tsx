@@ -1,16 +1,20 @@
-import { COMPANY, LOAN } from "@/lib/config";
+import { COMPANY, LOAN, cnpjValido } from "@/lib/config";
 import { brl, pct } from "@/lib/format";
 import { Logo } from "./Header";
 import Link from "next/link";
 
 export default function Footer() {
+  const temCnpj = cnpjValido(COMPANY.cnpj);
+  const temParceira = COMPANY.partner.trim().length > 0;
+
   return (
     <footer className="footer">
       <div className="wrap footer-grid">
         <div>
           <Logo />
           <p style={{ marginTop: 12 }}>
-            {COMPANY.name} · CNPJ {COMPANY.cnpj}
+            {COMPANY.name}
+            {temCnpj ? ` · CNPJ ${COMPANY.cnpj}` : ""}
           </p>
           <nav className="footer-links" aria-label="Informações legais">
             <Link href="/termos">Termos de Uso</Link>
@@ -19,9 +23,9 @@ export default function Footer() {
         </div>
         <div>
           <p>
-            {COMPANY.name} atua como correspondente no país de {COMPANY.partner}, responsável pela
-            concessão do crédito e pela conta de pagamento. Consulte os dados da instituição no
-            contrato.
+            {temParceira
+              ? `${COMPANY.name} atua como correspondente no país de ${COMPANY.partner}, responsável pela concessão do crédito e pela conta de pagamento. Consulte os dados da instituição no contrato.`
+              : `${COMPANY.name} atua na originação e no atendimento das solicitações de crédito. A concessão é feita pela instituição financeira parceira, identificada no contrato antes da contratação.`}
           </p>
           <p>
             Empréstimos de {brl(LOAN.min)} a {brl(LOAN.max)}, em 6 a 24 parcelas. Taxa a partir de{" "}

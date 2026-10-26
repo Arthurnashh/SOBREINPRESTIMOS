@@ -9,3 +9,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# segredo do cron (nunca versionar)
+.cron-secret

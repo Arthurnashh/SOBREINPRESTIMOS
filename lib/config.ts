@@ -11,7 +11,13 @@ export const LOAN = {
 export const COMPANY = {
   privacyEmail: process.env.NEXT_PUBLIC_PRIVACIDADE_EMAIL ?? "",
   name: process.env.NEXT_PUBLIC_EMPRESA_NOME ?? "SobreImpréstimos",
-  cnpj: process.env.NEXT_PUBLIC_EMPRESA_CNPJ ?? "00.000.000/0001-00",
-  partner:
-    process.env.NEXT_PUBLIC_INSTITUICAO_PARCEIRA ?? "[instituição financeira parceira]",
+  // Sem CNPJ configurado, o rodapé não inventa um número — omite a linha.
+  cnpj: process.env.NEXT_PUBLIC_EMPRESA_CNPJ ?? "",
+  partner: process.env.NEXT_PUBLIC_INSTITUICAO_PARCEIRA ?? "",
 };
+
+/** O CNPJ 00.000.000/0001-00 é placeholder: não serve para exibir ao público. */
+export function cnpjValido(cnpj: string) {
+  const d = cnpj.replace(/\D/g, "");
+  return d.length === 14 && !/^0+$/.test(d) && d !== "00000000000100";
+}

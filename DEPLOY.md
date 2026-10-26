@@ -51,11 +51,54 @@ no painel. Para um site dormente, vale o plano pago de US$25.
 
 **SQL Editor** → cole e rode, nesta ordem:
 
-1. `supabase/schema.sql` — tabelas, RLS, trigger de perfil
+1. `supabase/schema.sql` — perfis, pedidos, RLS, trigger de cadastro
 2. `supabase/admin.sql` — papel de admin, leitura total, `admin_set_decision`
+3. `supabase/bank.sql` — **conta bancária**: saldo, extrato, cartão, chaves PIX,
+   boletos e as funções que movimentam dinheiro
 
-Os dois são idempotentes (`if not exists` / `drop policy if exists`),
-então rodar de novo não quebra nada.
+Os três são idempotentes (`if not exists` / `drop policy if exists` /
+`create or replace`), então rodar de novo não quebra nada.
+
+> **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
+> conta e cartão no cadastro. Rode-o por último.
+
+### A conta bancária
+
+O saldo **não fica no navegador**: vive na tabela `bank_accounts`, e toda
+movimentação passa pelas funções `bank_*` (SECURITY DEFINER), que travam a
+linha da conta, validam saldo/limite e gravam o lançamento na mesma transação.
+
+| Tabela | Guarda |
+|---|---|
+| `bank_accounts` | agência, número, dígito, saldo, limite, status |
+| `bank_transactions` | extrato (positivo = entrada, negativo = saída) |
+| `bank_cards` | cartão virtual (só os 4 últimos dígitos e o hash do CVV) |
+| `bank_pix_keys` | chaves PIX do titular |
+| `bank_boletos` | boletos pagos |
+
+Ao criar a conta pelo `/cadastro`, o trigger `handle_new_user()` já emite
+a conta (agência `0001`) e o cartão virtual. Se a conta não existir por
+qualquer motivo, `/conta/banco` abre na primeira visita.
+
+> **`bank_move_for` move dinheiro em nome de outra pessoa** e por isso é
+> restrita ao `service_role`. Se um cliente comum chamá-la, recebe `403`.
+> É ela que credita o empréstimo liberado na conta do titular.
+
+### Crédito do empréstimo
+
+Quando o admin marca um pedido como **liberado** em `/admin/pedido/[id]`,
+o valor cai na conta do cliente. A operação é **idempotente**: liberar duas
+vezes não credita em dobro. Se aparecer "credito na conta falhou", rode a
+liberação de novo com segurança.
+
+Confira que os três schemas pegaram:
+
+```sql
+select
+  (select count(*) from public.profiles)          as perfis,
+  (select count(*) from public.bank_accounts)     as contas,
+  (select count(*) from public.bank_cards)        as cartoes;
+```
 
 ## Passo 3 — Criar o primeiro administrador
 

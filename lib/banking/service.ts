@@ -3,12 +3,21 @@ import type { PixKeyType } from "../validation";
 import {
   mensagemBanco,
   type Account,
+  type BankProfile,
   type Boleto,
   type Card,
+  type Deposit,
+  type DdaBoleto,
+  type Limits,
+  type PixCharge,
   type PixKey,
+  type Receipt,
   type Result,
+  type Schedule,
   type Summary,
+  type Topup,
   type Transaction,
+  type Withdrawal,
 } from "./types";
 
 /**
@@ -221,6 +230,356 @@ export class BankService {
 
   async removePixKey(id: string): Promise<Result> {
     const { error } = await this.supabase.rpc("bank_remove_pix_key", { p_id: id });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: undefined };
+  }
+
+  // -------------------------------------------------------------------
+  // Depósito, saque, recarga
+  // -------------------------------------------------------------------
+
+  async deposit(amount: number, method: Deposit["method"], origin?: string): Promise<Result<{ id: string }>> {
+    const { data, error } = await this.supabase.rpc("bank_deposit", {
+      p_amount: amount,
+      p_method: method,
+      p_origin: origin ?? null,
+    });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: { id: (data as { id: string }).id } };
+  }
+
+  async withdraw(amount: number, method: Withdrawal["method"]): Promise<Result<Withdrawal>> {
+    const { data, error } = await this.supabase.rpc("bank_withdraw", {
+      p_amount: amount,
+      p_method: method,
+    });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    const w = data as { id: string; amount: string | number; method: Withdrawal["method"]; withdraw_code: string; created_at: string };
+    return {
+      ok: true,
+      data: {
+        id: w.id,
+        amount: Number(w.amount),
+        method: w.method,
+        code: w.withdraw_code,
+        createdAt: w.created_at,
+      },
+    };
+  }
+
+  async topup(carrier: string, phone: string, amount: number): Promise<Result<{ id: string }>> {
+    const { data, error } = await this.supabase.rpc("bank_topup", {
+      p_carrier: carrier,
+      p_phone: phone,
+      p_amount: amount,
+    });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: { id: (data as { id: string }).id } };
+  }
+
+  async getDeposits(limit = 20): Promise<Deposit[]> {
+    const { data } = await this.supabase
+      .from("bank_deposits")
+      .select("id, amount, method, origin, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<{ id: string; amount: string | number; method: Deposit["method"]; origin: string | null; created_at: string }[]>();
+
+    return (data ?? []).map((d) => ({
+      id: d.id,
+      amount: Number(d.amount),
+      method: d.method,
+      origin: d.origin,
+      createdAt: d.created_at,
+    }));
+  }
+
+  async getWithdrawals(limit = 20): Promise<Withdrawal[]> {
+    const { data } = await this.supabase
+      .from("bank_withdrawals")
+      .select("id, amount, method, withdraw_code, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<{ id: string; amount: string | number; method: Withdrawal["method"]; withdraw_code: string; created_at: string }[]>();
+
+    return (data ?? []).map((w) => ({
+      id: w.id,
+      amount: Number(w.amount),
+      method: w.method,
+      code: w.withdraw_code,
+      createdAt: w.created_at,
+    }));
+  }
+
+  async getTopups(limit = 20): Promise<Topup[]> {
+    const { data } = await this.supabase
+      .from("bank_topups")
+      .select("id, carrier, phone, amount, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<{ id: string; carrier: string; phone: string; amount: string | number; created_at: string }[]>();
+
+    return (data ?? []).map((t) => ({
+      id: t.id,
+      carrier: t.carrier,
+      phone: t.phone,
+      amount: Number(t.amount),
+      createdAt: t.created_at,
+    }));
+  }
+
+  // -------------------------------------------------------------------
+  // PIX recebido (cobrança)
+  // -------------------------------------------------------------------
+
+  async createPixCharge(amount: number, description?: string): Promise<Result<PixCharge>> {
+    const { data, error } = await this.supabase.rpc("bank_create_pix_charge", {
+      p_amount: amount,
+      p_description: description ?? null,
+    });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    const c = data as {
+      id: string;
+      amount: string | number;
+      description: string | null;
+      emv: string;
+      status: PixCharge["status"];
+      created_at: string;
+    };
+    return {
+      ok: true,
+      data: {
+        id: c.id,
+        amount: Number(c.amount),
+        description: c.description,
+        emv: c.emv,
+        status: c.status,
+        createdAt: c.created_at,
+      },
+    };
+  }
+
+  async cancelPixCharge(id: string): Promise<Result> {
+    const { error } = await this.supabase.rpc("bank_cancel_pix_charge", { p_id: id });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: undefined };
+  }
+
+  async getPixCharges(limit = 20): Promise<PixCharge[]> {
+    const { data } = await this.supabase
+      .from("bank_pix_charges")
+      .select("id, amount, description, emv, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<
+        { id: string; amount: string | number; description: string | null; emv: string; status: PixCharge["status"]; created_at: string }[]
+      >();
+
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      amount: Number(c.amount),
+      description: c.description,
+      emv: c.emv,
+      status: c.status,
+      createdAt: c.created_at,
+    }));
+  }
+
+  // -------------------------------------------------------------------
+  // Agendamento
+  // -------------------------------------------------------------------
+
+  async schedule(
+    kind: Schedule["kind"],
+    target: string,
+    amount: number,
+    runsOn: string,
+    message?: string
+  ): Promise<Result<{ id: string }>> {
+    const { data, error } = await this.supabase.rpc("bank_schedule", {
+      p_kind: kind,
+      p_target: target,
+      p_amount: amount,
+      p_runs_on: runsOn,
+      p_message: message ?? null,
+    });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: { id: (data as { id: string }).id } };
+  }
+
+  async cancelSchedule(id: string): Promise<Result> {
+    const { error } = await this.supabase.rpc("bank_cancel_schedule", { p_id: id });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: undefined };
+  }
+
+  async getSchedules(limit = 30): Promise<Schedule[]> {
+    const { data } = await this.supabase
+      .from("bank_schedules")
+      .select("id, kind, target, amount, message, runs_on, status, created_at")
+      .order("runs_on", { ascending: true })
+      .limit(limit)
+      .returns<
+        {
+          id: string;
+          kind: Schedule["kind"];
+          target: string;
+          amount: string | number;
+          message: string | null;
+          runs_on: string;
+          status: Schedule["status"];
+          created_at: string;
+        }[]
+      >();
+
+    return (data ?? []).map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      target: s.target,
+      amount: Number(s.amount),
+      message: s.message,
+      runsOn: s.runs_on,
+      status: s.status,
+      createdAt: s.created_at,
+    }));
+  }
+
+  // -------------------------------------------------------------------
+  // DDA
+  // -------------------------------------------------------------------
+
+  async getDda(): Promise<DdaBoleto[]> {
+    const { data } = await this.supabase
+      .from("bank_dda")
+      .select("id, barcode, beneficiary, amount, due_date, status")
+      .order("due_date", { ascending: true })
+      .returns<
+        {
+          id: string;
+          barcode: string;
+          beneficiary: string;
+          amount: string | number;
+          due_date: string;
+          status: DdaBoleto["status"];
+        }[]
+      >();
+
+    return (data ?? []).map((d) => ({
+      id: d.id,
+      barcode: d.barcode,
+      beneficiary: d.beneficiary,
+      amount: Number(d.amount),
+      dueDate: d.due_date,
+      status: d.status,
+    }));
+  }
+
+  async payDda(id: string): Promise<Result<{ id: string }>> {
+    const { data, error } = await this.supabase.rpc("bank_pay_dda", { p_id: id });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: { id: (data as { id: string }).id } };
+  }
+
+  // -------------------------------------------------------------------
+  // Cartão, comprovantes, cadastro e limites
+  // -------------------------------------------------------------------
+
+  async setCardStatus(status: "ativo" | "bloqueado"): Promise<Result> {
+    const { error } = await this.supabase.rpc("bank_set_card_status", { p_status: status });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: undefined };
+  }
+
+  async getReceipts(limit = 30): Promise<Receipt[]> {
+    const { data } = await this.supabase
+      .from("bank_receipts")
+      .select("id, kind, title, payload, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<{ id: string; kind: string; title: string; payload: Record<string, unknown>; created_at: string }[]>();
+
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      title: r.title,
+      payload: r.payload ?? {},
+      createdAt: r.created_at,
+    }));
+  }
+
+  async getProfile(): Promise<BankProfile | null> {
+    const { data } = await this.supabase
+      .from("bank_profiles")
+      .select("address_line, address_num, complement, district, city, state, zip, occupation, income")
+      .maybeSingle<{
+        address_line: string | null;
+        address_num: string | null;
+        complement: string | null;
+        district: string | null;
+        city: string | null;
+        state: string | null;
+        zip: string | null;
+        occupation: string | null;
+        income: string | number | null;
+      }>();
+
+    if (!data) return null;
+    return {
+      addressLine: data.address_line,
+      addressNum: data.address_num,
+      complement: data.complement,
+      district: data.district,
+      city: data.city,
+      state: data.state,
+      zip: data.zip,
+      occupation: data.occupation,
+      income: data.income === null ? null : Number(data.income),
+    };
+  }
+
+  async saveProfile(p: Omit<BankProfile, "income"> & { income: number | null }): Promise<Result> {
+    const { error } = await this.supabase.rpc("bank_save_profile", {
+      p_address_line: p.addressLine ?? "",
+      p_address_num: p.addressNum ?? "",
+      p_complement: p.complement ?? "",
+      p_district: p.district ?? "",
+      p_city: p.city ?? "",
+      p_state: p.state ?? "",
+      p_zip: p.zip ?? "",
+      p_occupation: p.occupation ?? "",
+      p_income: p.income,
+    });
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+    return { ok: true, data: undefined };
+  }
+
+  async getLimits(): Promise<Limits | null> {
+    const { data } = await this.supabase
+      .from("bank_limits")
+      .select("pix_per_tx, pix_per_day, transfer_per_tx, withdraw_per_day")
+      .maybeSingle<{
+        pix_per_tx: string | number;
+        pix_per_day: string | number;
+        transfer_per_tx: string | number;
+        withdraw_per_day: string | number;
+      }>();
+
+    if (!data) return null;
+    return {
+      pixPerTx: Number(data.pix_per_tx),
+      pixPerDay: Number(data.pix_per_day),
+      transferPerTx: Number(data.transfer_per_tx),
+      withdrawPerDay: Number(data.withdraw_per_day),
+    };
+  }
+
+  async setLimits(l: Limits): Promise<Result> {
+    const { error } = await this.supabase.rpc("bank_set_limits", {
+      p_pix_per_tx: l.pixPerTx,
+      p_pix_per_day: l.pixPerDay,
+      p_transfer_per_tx: l.transferPerTx,
+      p_withdraw_per_day: l.withdrawPerDay,
+    });
     if (error) return { ok: false, error: mensagemBanco(error.message) };
     return { ok: true, data: undefined };
   }
