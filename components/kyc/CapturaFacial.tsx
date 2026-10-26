@@ -140,14 +140,29 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
   const capturar = async () => {
     const v = videoRef.current;
     const c = canvasRef.current;
-    if (!v || !c || !metricas) return;
-
-    if (!metricas.ok) {
-      setErro(metricas.problemas[0] ?? "Ajuste o enquadramento.");
+    if (!v || !c) {
+      setErro("A câmera ainda não está pronta. Aguarde um instante.");
       return;
     }
-    if (movimento > 22) {
-      setErro("Segure firme, você está se mexendo muito.");
+
+    // O quadro precisa ter sido analisado ao menos uma vez.
+    if (!metricas) {
+      setErro("Só um instante: ainda estou analisando o enquadramento.");
+      return;
+    }
+
+    // Antes o botão ficava desabilitado e a pessoa não entendia por quê.
+    // Agora clicamos sempre e explicamos o que ajustar.
+    if (!metricas.ok) {
+      setErro(metricas.problemas[0] ?? "Ajuste o enquadramento e tente de novo.");
+      return;
+    }
+
+    // Movimento NÃO bloqueia mais a captura. A prova de vida depende de a
+    // pessoa virar o rosto, então recusar por movimento contradizia a própria
+    // instrução da tela. Só barramos tremor extremo, com folga bem maior.
+    if (movimento > 45) {
+      setErro("Segure firme por um instante e toque de novo.");
       return;
     }
 
@@ -254,11 +269,19 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
       <button
         className="bank-acao principal kyc-btn"
         onClick={capturar}
-        disabled={!pronto || capturando || salvando || !metricas?.ok}
+        disabled={!pronto || capturando || salvando}
       >
         <IconePerfil size={18} />
         {salvando ? "Concluindo…" : capturando ? "Capturando…" : ultimo ? "Concluir biometria" : `Capturar ${atual.label.toLowerCase()}`}
       </button>
+
+      {/* O botão fica sempre clicável: se o quadro não estiver bom, dizemos o
+          que ajustar em vez de deixar um botão morto sem explicação. */}
+      {pronto && !capturando && !salvando && metricas && !metricas.ok && (
+        <p className="fine kyc-aviso-clique">
+          Dá para clicar assim que ajustar: {metricas.problemas[0]}
+        </p>
+      )}
 
       <p className="fine kyc-privacidade">
         <IconeCadeado size={14} /> As fotos ficam guardadas em área privada, visíveis só para você e

@@ -306,6 +306,14 @@
 
 .kyc-btn { width: 100%; justify-content: center; }
 
+/* Aviso de por que o clique ainda não vai render boa foto. Fica logo abaixo do
+   botão, que agora está sempre habilitado. */
+.kyc-aviso-clique {
+  text-align: center;
+  margin-top: -4px;
+  color: #92400e;
+}
+
 .kyc-privacidade {
   display: flex;
   align-items: center;

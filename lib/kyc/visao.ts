@@ -33,21 +33,40 @@ function lum(r: number, g: number, b: number): number {
 }
 
 /**
- * Tom de pele em RGB. Faixa larga de propósito: funciona em várias
- * tonalidades e iluminações sem virar detector de nada.
+ * Tom de pele em RGB.
+ *
+ * A versão anterior aceitava qualquer coisa "avermelhada e clara" (r>g, r>b,
+ * max-min>10). Isso classificava PAREDE BEGE e MARROM como pele: contra um
+ * fundo assim, o quadro inteiro virava "rosto", o tamanho ia a 0.99 e a tela
+ * pedia "afaste-se" para sempre — sem jeito de satisfazer.
+ *
+ * Agora exigimos a faixa de croma da pele: o vermelho precisa dominar o azul
+ * com folga, mas sem estourar, e o verde fica entre os dois. Parede bege tem
+ * r≈g≈b demais para passar; madeira e marrom têm saturação alta demais.
  */
 function ehPele(r: number, g: number, b: number): boolean {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  return (
-    r > 60 &&
-    g > 30 &&
-    b > 15 &&
-    r > g &&
-    r > b &&
-    r - Math.min(g, b) > 12 &&
-    max - min > 10
-  );
+  const croma = max - min;
+
+  // claridade: nem sombra fechada, nem estourado
+  if (max < 70 || max > 250) return false;
+
+  // pele tem croma moderado; cinza/bege claro tem pouco, madeira tem muito
+  if (croma < 15 || croma > 115) return false;
+
+  // o vermelho lidera, mas o verde acompanha perto — é o que separa pele de
+  // vermelho puro e de marrom saturado
+  if (r < g || r < b) return false;
+  const rg = r - g;
+  const gb = g - b;
+  if (rg < 8 || rg > 95) return false;
+  if (gb < 2) return false;
+
+  // normaliza pelo vermelho: reduz o efeito de iluminação
+  const nr = r / (r + g + b);
+  const ng = g / (r + g + b);
+  return nr > 0.33 && nr < 0.52 && ng > 0.28 && ng < 0.40;
 }
 
 /**
@@ -120,7 +139,11 @@ export function analisarQuadro(
   const media = n ? soma / n : 0;
   const nitidez = n ? somaQuad / n - media * media : 0;
 
-  if (nitidez < 45) problemas.push("A imagem está sem nitidez. Segure o celular firme.");
+  // Limite propositalmente baixo. A variância do laplaciano cai muito com
+  // webcam comum, luz de casa e leve tremida — um corte alto deixava o botão
+  // de captura travado para sempre em aparelhos normais. O objetivo aqui é
+  // separar "dá para ver o rosto" de "borrão inútil", não exigir foto de estúdio.
+  if (nitidez < 18) problemas.push("A imagem está sem nitidez. Segure o celular firme.");
 
   // ---------- posição e tamanho do rosto ----------
   let centralizacao = 0;
@@ -137,9 +160,35 @@ export function analisarQuadro(
     const alturaBlob = maxY - minY;
     tamanho = (larguraBlob * alturaBlob) / (largura * altura);
 
-    if (centralizacao < 0.45) problemas.push("Centralize o rosto no círculo.");
-    if (tamanho < 0.06) problemas.push("Aproxime-se um pouco da câmera.");
-    if (tamanho > 0.75) problemas.push("Afaste-se um pouco da câmera.");
+    /*
+     * Parede bege é, em RGB, praticamente igual a pele — nenhuma regra de cor
+     * separa as duas. O que separa é a FORMA: um fundo encosta nas bordas do
+     * quadro, um rosto não. Se a "pele" ocupa as quatro bordas, é parede.
+     */
+    const encostaEsquerda = minX <= 1;
+    const encostaDireita = maxX >= largura - 2;
+    const encostaTopo = minY <= 1;
+    const encostaBase = maxY >= altura - 2;
+
+    if (encostaEsquerda && encostaDireita && encostaTopo && encostaBase) {
+      problemas.push(
+        "O fundo tem um tom parecido com a pele. Coloque-se na frente de uma parede de cor diferente ou aproxime o rosto."
+      );
+      // não seguimos avaliando posição/tamanho: a medida não é confiável aqui
+      return {
+        nitidez: Math.round(nitidez),
+        brilho: Math.round(brilho),
+        pele: Number(pele.toFixed(3)),
+        centralizacao: 0,
+        tamanho: Number(tamanho.toFixed(3)),
+        ok: false,
+        problemas,
+      };
+    }
+
+    if (centralizacao < 0.3) problemas.push("Centralize o rosto no círculo.");
+    if (tamanho < 0.04) problemas.push("Aproxime-se um pouco da câmera.");
+    if (tamanho > 0.85) problemas.push("Afaste-se um pouco da câmera.");
   } else {
     problemas.push("Não encontrei um rosto no quadro. Melhore a luz e olhe para a câmera.");
   }
