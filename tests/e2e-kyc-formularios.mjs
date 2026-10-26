@@ -114,9 +114,14 @@ st = (await rpc("kyc_meu_status")).data ?? {};
 ok("tipo do documento gravado", st.doc_type === "cnh", st.doc_type);
 ok("número do documento gravado", st.doc_number === "01234567890", st.doc_number);
 
-/* 6. com tudo preenchido, o envio deixa de reclamar (avança de verdade) */
+/* 6. com tudo preenchido, o envio deixa de reclamar dos textos e só pede fotos */
 const env1 = await rpc("kyc_enviar");
-ok("o envio agora só reclama do que é foto (não dos dados)", !/dados pessoais|endereço|documento'/i.test(env1.erro), env1.erro.slice(0, 200));
+ok("não reclama mais de dados pessoais", !/dados pessoais/i.test(env1.erro), env1.erro.slice(0, 200));
+// O item do endereço é exatamente "endereço"; "comprovante de endereço" é foto
+// e continua faltando de propósito, então a checagem é pelo item isolado.
+ok("não reclama mais do endereço", !/(^|, )endereço(,|$)/i.test(env1.erro), env1.erro.slice(0, 200));
+ok("não reclama mais dos dados do documento", !/dados do documento/i.test(env1.erro), env1.erro.slice(0, 200));
+ok("ainda pede o comprovante de endereço (é foto)", /comprovante de endereço/i.test(env1.erro));
 ok("reclama das fotos que faltam", /frente do documento|comprovante|selfie/i.test(env1.erro), env1.erro.slice(0, 200));
 
 /* ------------------------------- limpeza ------------------------------- */
