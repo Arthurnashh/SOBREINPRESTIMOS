@@ -6,6 +6,7 @@ import {
   type BankProfile,
   type Boleto,
   type Card,
+  type CardFull,
   type Deposit,
   type DdaBoleto,
   type Limits,
@@ -488,6 +489,39 @@ export class BankService {
     const { error } = await this.supabase.rpc("bank_set_card_status", { p_status: status });
     if (error) return { ok: false, error: mensagemBanco(error.message) };
     return { ok: true, data: undefined };
+  }
+
+  /** Número completo, validade e CVV. Só o titular consegue (auth.uid()). */
+  async getCardFull(): Promise<Result<CardFull>> {
+    const { data, error } = await this.supabase.rpc("bank_card_full");
+    if (error) return { ok: false, error: mensagemBanco(error.message) };
+
+    const c = data as {
+      number: string;
+      last4: string;
+      cvv: string;
+      brand: string;
+      holder: string;
+      expiry: string;
+      expiry_month: number;
+      expiry_year: number;
+      status: Card["status"];
+    };
+
+    return {
+      ok: true,
+      data: {
+        number: c.number,
+        last4: c.last4,
+        cvv: c.cvv,
+        brand: c.brand,
+        holder: c.holder,
+        expiry: c.expiry,
+        expiryMonth: c.expiry_month,
+        expiryYear: c.expiry_year,
+        status: c.status,
+      },
+    };
   }
 
   async getReceipts(limit = 30): Promise<Receipt[]> {

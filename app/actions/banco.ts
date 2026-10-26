@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/account";
 import { getBanking } from "@/lib/banking";
+import type { CardFull } from "@/lib/banking";
 import { isValidPixKey, onlyDigits, type PixKeyType } from "@/lib/validation";
 
 export type Comprovante = {
@@ -405,6 +406,19 @@ export async function alterarStatusCartao(formData: FormData) {
   const { bank } = await ctx();
   await bank.setCardStatus(status);
   revalidatePath("/conta/banco");
+}
+
+/**
+ * Dados completos do cartão. Chamada só quando o titular pede para ver —
+ * assim o número e o CVV não trafegam no carregamento normal da página.
+ */
+export async function dadosCompletosCartao(): Promise<
+  { ok: true; dados: CardFull } | { ok: false; error: string }
+> {
+  const { bank } = await ctx();
+  const r = await bank.getCardFull();
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, dados: r.data };
 }
 
 // ---------------------------------------------------------------------

@@ -1,7 +1,8 @@
 import { removerChavePix } from "@/app/actions/banco";
-import { date } from "@/lib/format";
+import { brl, date } from "@/lib/format";
 import FormChavePix from "./FormChavePix";
 import Operacoes from "./Operacoes";
+import { IconePix } from "./Icones";
 import type { PixKey, PixCharge } from "@/lib/banking";
 
 const TIPO_CHAVE: Record<string, string> = {
@@ -38,8 +39,13 @@ export default function PainelPix({
     <div className="stack" style={{ ["--gap" as string]: "16px" }}>
       <section className="bank-secao">
         <header>
-          <h2>Área PIX</h2>
-          <span className="bank-chip">Disponível {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(disponivel)}</span>
+          <h2 className="titulo-com-icone">
+            <span className="glifo">
+              <IconePix size={19} />
+            </span>
+            Área PIX
+          </h2>
+          <span className="bank-chip">Disponível {brl(disponivel)}</span>
         </header>
         <Operacoes disponivel={disponivel} />
       </section>
@@ -84,7 +90,7 @@ export default function PainelPix({
               <div className="bank-linha" key={c.id}>
                 <div>
                   <div className="quem">
-                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(c.amount)}
+                    {brl(c.amount)}
                   </div>
                   <div className="quando">
                     {c.description || "Cobrança PIX"} · {date(c.createdAt)}

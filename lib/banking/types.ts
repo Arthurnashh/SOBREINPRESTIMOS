@@ -48,6 +48,19 @@ export type Card = {
   status: "ativo" | "bloqueado" | "cancelado";
 };
 
+/** Dados completos do cartão, buscados só quando o titular pede para ver. */
+export type CardFull = {
+  number: string;
+  last4: string;
+  cvv: string;
+  brand: string;
+  holder: string;
+  expiry: string;
+  expiryMonth: number;
+  expiryYear: number;
+  status: Card["status"];
+};
+
 export type PixKey = {
   id: string;
   keyType: PixKeyType;

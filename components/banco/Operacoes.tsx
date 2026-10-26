@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import FormPix from "./FormPix";
 import FormTransferencia from "./FormTransferencia";
 import FormBoleto from "./FormBoleto";
@@ -9,38 +9,63 @@ import FormSaque from "./FormSaque";
 import FormRecarga from "./FormRecarga";
 import FormCobranca from "./FormCobranca";
 import FormAgendamento from "./FormAgendamento";
+import {
+  IconeEnviar,
+  IconeReceber,
+  IconeTransferir,
+  IconeDepositar,
+  IconeSacar,
+  IconeBoleto,
+  IconeRecarga,
+  IconeAgendar,
+} from "./Icones";
 
-type Aba = "pix" | "cobranca" | "transferencia" | "deposito" | "saque" | "boleto" | "recarga" | "agendamento";
+type Aba =
+  | "pix"
+  | "cobranca"
+  | "transferencia"
+  | "deposito"
+  | "saque"
+  | "boleto"
+  | "recarga"
+  | "agendamento";
 
-const ABAS: { key: Aba; label: string }[] = [
-  { key: "pix", label: "Enviar PIX" },
-  { key: "cobranca", label: "Receber PIX" },
-  { key: "transferencia", label: "Transferir" },
-  { key: "deposito", label: "Depositar" },
-  { key: "saque", label: "Sacar" },
-  { key: "boleto", label: "Pagar boleto" },
-  { key: "recarga", label: "Recarga" },
-  { key: "agendamento", label: "Agendar" },
+const ABAS: { key: Aba; label: string; Icone: (p: { size?: number }) => ReactNode }[] = [
+  { key: "pix", label: "Enviar PIX", Icone: IconeEnviar },
+  { key: "cobranca", label: "Receber PIX", Icone: IconeReceber },
+  { key: "transferencia", label: "Transferir", Icone: IconeTransferir },
+  { key: "deposito", label: "Depositar", Icone: IconeDepositar },
+  { key: "saque", label: "Sacar", Icone: IconeSacar },
+  { key: "boleto", label: "Pagar boleto", Icone: IconeBoleto },
+  { key: "recarga", label: "Recarga", Icone: IconeRecarga },
+  { key: "agendamento", label: "Agendar", Icone: IconeAgendar },
 ];
 
 export default function Operacoes({ disponivel }: { disponivel: number }) {
   const [aba, setAba] = useState<Aba>("pix");
 
   return (
-    <section className="card stack" style={{ ["--gap" as string]: "18px" }}>
-      <div className="nav" style={{ flexWrap: "wrap" }} role="tablist" aria-label="Operações">
-        {ABAS.map((a) => (
-          <button
-            key={a.key}
-            role="tab"
-            aria-selected={aba === a.key}
-            className={`btn ${aba === a.key ? "btn-primary" : "btn-ghost"}`}
-            style={{ height: 38, fontSize: 14 }}
-            onClick={() => setAba(a.key)}
-          >
-            {a.label}
-          </button>
-        ))}
+    <div className="stack" style={{ ["--gap" as string]: "18px" }}>
+      <div
+        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+        role="tablist"
+        aria-label="Operações"
+      >
+        {ABAS.map((a) => {
+          const ativa = aba === a.key;
+          return (
+            <button
+              key={a.key}
+              role="tab"
+              aria-selected={ativa}
+              className={`bank-acao${ativa ? " principal" : ""}`}
+              onClick={() => setAba(a.key)}
+            >
+              <a.Icone size={17} />
+              {a.label}
+            </button>
+          );
+        })}
       </div>
 
       {aba === "pix" && <FormPix disponivel={disponivel} />}
@@ -51,6 +76,6 @@ export default function Operacoes({ disponivel }: { disponivel: number }) {
       {aba === "boleto" && <FormBoleto disponivel={disponivel} />}
       {aba === "recarga" && <FormRecarga disponivel={disponivel} />}
       {aba === "agendamento" && <FormAgendamento disponivel={disponivel} />}
-    </section>
+    </div>
   );
 }

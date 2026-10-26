@@ -108,19 +108,46 @@ ok("segunda execução não debita de novo", perto(saldoAntes2, saldoDepois2), `
 ok("segunda execução não reprocessa nada", Number(run2.data) === 0, `retornou ${JSON.stringify(run2.data)}`);
 
 // agendamento sem saldo vira 'falhou' em vez de travar a fila
+// agendamento que vai falhar por falta de saldo na execução:
+// precisa de saldo agora para ser aceito, e de saldo zero depois para falhar.
+const saldoAntesDeAgendar = await saldo();
+if (saldoAntesDeAgendar < 10) {
+  await rpc("bank_deposit", { p_amount: 50, p_method: "pix", p_origin: "Preparo do teste de falha" });
+}
 const semSaldo = await rpc("bank_schedule", {
   p_kind: "pix", p_target: "x@y.com", p_amount: 10, p_runs_on: hoje(),
 });
+const semSaldoId = (Array.isArray(semSaldo.data) ? semSaldo.data[0] : semSaldo.data)?.id;
+// Agendamento sem saldo NA HORA DE EXECUTAR vira 'falhou' em vez de travar a fila.
+//
+// bank_schedule exige saldo no momento de agendar, então o caminho é:
+// agendar com saldo, zerar saldo + limite, e só então rodar a fila.
+// Usamos service_role para zerar, porque bank_withdraw respeita o saldo
+// disponível e não deixaria a conta exatamente em zero.
 if (semSaldo.ok) {
-  // drena o saldo para forçar a falha
-  const atual = await saldo();
-  if (atual > 0) await rpc("bank_withdraw", { p_amount: atual, p_method: "pix" });
+  const zerar = await fetch(`${URL_BASE}/rest/v1/bank_accounts?user_id=eq.${USER_ID}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ balance: 0, overdraft: 0 }),
+  });
+  ok("conta zerada para o teste de falha", zerar.ok, `status ${zerar.status}`);
+
   const run3 = await rpc("bank_run_schedules", {}, SERVICE, SERVICE);
   ok("fila roda mesmo com agendamento sem saldo", run3.ok, run3.erro);
-  const falhouLinha = await ler("bank_schedules", "select=status&status=eq.falhou&limit=1");
-  ok("agendamento sem saldo marcado como falhou", falhouLinha.length > 0, JSON.stringify(falhouLinha));
+
+  const estaLinha = await ler("bank_schedules", `select=status&id=eq.${semSaldoId}`);
+  ok("agendamento sem saldo marcado como falhou", estaLinha[0]?.status === "falhou", estaLinha[0]?.status);
+
+  // devolve saldo para o teste de PIX recebido
+  await rpc("bank_deposit", { p_amount: 100, p_method: "pix", p_origin: "Restaura saldo do teste" });
 } else {
-  ok("fila roda mesmo com agendamento sem saldo", false, `não consegui agendar: ${semSaldo.erro}`);
+  ok("conta zerada para o teste de falha", false, `não consegui agendar: ${semSaldo.erro}`);
+  ok("fila roda mesmo com agendamento sem saldo", false, "dependência falhou");
   ok("agendamento sem saldo marcado como falhou", false, "dependência falhou");
 }
 

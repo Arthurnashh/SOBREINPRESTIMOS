@@ -110,5 +110,30 @@ ok("nenhum undefined renderizado (fora do protocolo RSC)", !/(?<!\$)undefined/.t
 ok("nenhum 'NaN'", !/NaN/.test(html));
 ok("nenhum '[object Object]'", !/\[object Object\]/.test(html));
 
+console.log("\n=== ÍCONES SVG (sem emoji) ===\n");
+// A shell e as abas usam <svg> desenhado à mão. Emoji em texto seria o sintoma
+// de interface genérica.
+const emoji = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
+ok("HTML não tem emoji", !emoji.test(html), (html.match(emoji) ?? [])[0] ?? "");
+
+const svgsServidor = (bruto.match(/<svg/g) ?? []).length;
+ok("ícones SVG no HTML do servidor", svgsServidor >= 6, `${svgsServidor} <svg>`);
+
+// as abas de operação trazem ícone próprio no bundle
+const svgsBundle = (bundleAbas.match(/createElement\("svg"|jsx\("svg"/g) ?? []).length;
+ok("ícones das operações no bundle", svgsBundle >= 8, `${svgsBundle} ocorrências`);
+
+console.log("\n=== CARTÃO: VER E COPIAR DADOS ===\n");
+for (const alvo of [
+  ["Ver dados do cartão", /Ver dados do cartão/],
+  ["Copiar número", /Copiar número/],
+  ["Copiar CVV", /Copiar CVV/],
+  ["Copiar todos os dados", /Copiar todos os dados/],
+  ["Esconder dados", /Esconder dados/],
+]) {
+  ok(`"${alvo[0]}" no bundle do cliente`, alvo[1].test(bundleAbas));
+}
+ok("rótulo 'Meus cartões' no HTML", /Meus cartões/.test(bruto));
+
 console.log(`\n=== ${passou} passaram, ${falhou} falharam ===\n`);
 process.exit(falhou ? 1 : 0);

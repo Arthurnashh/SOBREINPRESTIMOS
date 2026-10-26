@@ -1,5 +1,6 @@
 import FormLimites from "./FormLimites";
 import { WITHDRAW_LABEL } from "@/lib/banking";
+import { IconeCartao, IconeEscudo, IconePerfil } from "./Icones";
 import type { Account, Card, Limits, Withdrawal } from "@/lib/banking";
 
 const GRADE_SEGURANCA = [
@@ -36,7 +37,12 @@ export default function PainelConfig({
 
       <section className="bank-secao">
         <header>
-          <h2>Segurança</h2>
+          <h2 className="titulo-com-icone">
+            <span className="glifo">
+              <IconeEscudo size={19} />
+            </span>
+            Segurança
+          </h2>
         </header>
         <p className="fine">
           Aviso importante: nós <strong>nunca</strong> pedimos depósito, PIX ou boleto para liberar
@@ -54,7 +60,12 @@ export default function PainelConfig({
 
       <section className="bank-secao">
         <header>
-          <h2>Dados da conta</h2>
+          <h2 className="titulo-com-icone">
+            <span className="glifo">
+              <IconePerfil size={19} />
+            </span>
+            Dados da conta
+          </h2>
         </header>
         <div className="bank-linha">
           <div>

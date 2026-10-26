@@ -2,16 +2,26 @@
 
 import { useState, type ReactNode } from "react";
 import { brl } from "@/lib/format";
+import {
+  IconeConfig,
+  IconePerfil,
+  IconeInicio,
+  IconePix,
+  IconeCartao,
+  IconeExtrato,
+  IconeOlho,
+  IconeOlhoFechado,
+} from "./Icones";
 
 type Aba = "inicio" | "pix" | "cartoes" | "extrato" | "perfil" | "config";
 
-const ABAS: { key: Aba; label: string; icone: string }[] = [
-  { key: "inicio", label: "Início", icone: "🏠" },
-  { key: "pix", label: "Área PIX", icone: "⚡" },
-  { key: "cartoes", label: "Cartões", icone: "💳" },
-  { key: "extrato", label: "Extrato", icone: "📄" },
-  { key: "perfil", label: "Perfil", icone: "👤" },
-  { key: "config", label: "Config", icone: "⚙️" },
+const ABAS: { key: Aba; label: string; Icone: (p: { size?: number }) => ReactNode }[] = [
+  { key: "inicio", label: "Início", Icone: IconeInicio },
+  { key: "pix", label: "Área PIX", Icone: IconePix },
+  { key: "cartoes", label: "Cartões", Icone: IconeCartao },
+  { key: "extrato", label: "Extrato", Icone: IconeExtrato },
+  { key: "perfil", label: "Perfil", Icone: IconePerfil },
+  { key: "config", label: "Config", Icone: IconeConfig },
 ];
 
 export type AbaBanco = Aba;
@@ -62,7 +72,7 @@ export default function BankShell({
             aria-label="Configurações da conta"
             title="Configurações"
           >
-            ⚙️
+            <IconeConfig size={21} />
           </button>
           <button
             className="bank-icon-btn"
@@ -70,7 +80,7 @@ export default function BankShell({
             aria-label="Meu perfil"
             title="Meu perfil"
           >
-            👤
+            <IconePerfil size={21} />
           </button>
         </div>
       </div>
@@ -85,7 +95,7 @@ export default function BankShell({
               aria-label={visivel ? "Ocultar saldo" : "Mostrar saldo"}
               title={visivel ? "Ocultar saldo" : "Mostrar saldo"}
             >
-              {visivel ? "🙈" : "👁️"}
+              {visivel ? <IconeOlho size={17} /> : <IconeOlhoFechado size={17} />}
             </button>
           </div>
           <div className={`valor${visivel ? "" : " oculto"}`}>
@@ -102,8 +112,8 @@ export default function BankShell({
             onClick={() => irPara(a.key)}
             aria-current={aba === a.key ? "page" : undefined}
           >
-            <span className="icone" aria-hidden>
-              {a.icone}
+            <span className="icone">
+              <a.Icone size={22} />
             </span>
             {a.label}
           </button>

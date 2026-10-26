@@ -123,6 +123,129 @@ revoke all on function public.bank_move_for(uuid, text, text, numeric, text, tex
 grant execute on function public.bank_move_for(uuid, text, text, numeric, text, text) to service_role;
 
 -- ---------------------------------------------------------------------
+-- DADOS COMPLETOS DO CARTÃO (número, validade e CVV)
+--
+--   O banco NÃO guarda o número completo nem o CVV — só os 4 últimos
+--   dígitos e um hash. Isso é proposital: se o banco vazar, não há o que
+--   usar. Mas o titular precisa ver o próprio cartão.
+--
+--   Solução: derivar de forma determinística a partir de um segredo do
+--   servidor (`bank_card_secret`), que vive numa tabela sem leitura para
+--   o cliente. Mesmo titular + mesmo segredo = mesmo número, sempre.
+--   O número sai com Luhn válido, então passa em validação de formulário.
+-- ---------------------------------------------------------------------
+create table if not exists public.bank_secrets (
+  nome  text primary key,
+  valor text not null,
+  criado_em timestamptz not null default now()
+);
+
+alter table public.bank_secrets enable row level security;
+-- ninguém lê por PostgREST; só as funções SECURITY DEFINER abaixo
+revoke all on public.bank_secrets from anon, authenticated;
+
+-- gera o segredo na primeira execução; nas seguintes não mexe
+insert into public.bank_secrets (nome, valor)
+values ('card_secret', encode(extensions.gen_random_bytes(32), 'hex'))
+on conflict (nome) do nothing;
+
+/** Dígito verificador de Luhn para um prefixo numérico. */
+create or replace function public.bank_luhn(p_prefixo text)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  i        int;
+  soma     int := 0;
+  digito   int;
+  dobrar   boolean := true;   -- o DV entra à direita, então o último do prefixo dobra
+  n        int;
+begin
+  for i in reverse length(p_prefixo)..1 loop
+    n := substr(p_prefixo, i, 1)::int;
+    if dobrar then
+      n := n * 2;
+      if n > 9 then n := n - 9; end if;
+    end if;
+    soma := soma + n;
+    dobrar := not dobrar;
+  end loop;
+  digito := (10 - (soma % 10)) % 10;
+  return digito::text;
+end;
+$$;
+
+/** Trunca o hash em dígitos decimais de tamanho pedido. */
+create or replace function public.bank_digitos(p_semente text, p_qtd int)
+returns text
+language sql
+immutable
+as $$
+  -- digest em hex dá 0-9a-f; queremos só 0-9. Usamos o byte cru módulo 10,
+  -- assim cada posição é um decimal uniforme e determinístico.
+  select string_agg((get_byte(extensions.digest(p_semente || g::text, 'sha256'), g % 32) % 10)::text, '')
+    from generate_series(1, p_qtd) g;
+$$;
+
+create or replace function public.bank_card_full()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  uid     uuid := auth.uid();
+  card    public.bank_cards;
+  segredo text;
+  v_pan   text;
+  v_cvv   text;
+  v_last4 text;
+begin
+  if uid is null then raise exception 'não autenticado'; end if;
+
+  select * into card from public.bank_cards where user_id = uid;
+  if not found then raise exception 'cartão não encontrado'; end if;
+
+  select valor into segredo from public.bank_secrets where nome = 'card_secret';
+  if segredo is null then raise exception 'cartão indisponível'; end if;
+
+  -- BIN 4xxx (Visa): '4' + 14 dígitos derivados = 15, + DV de Luhn = 16
+  v_pan := '4' || public.bank_digitos(segredo || uid::text || card.id::text, 14);
+  v_pan := v_pan || public.bank_luhn(v_pan);
+
+  v_last4 := right(v_pan, 4);
+
+  -- CVV de 3 dígitos, derivado de semente diferente
+  v_cvv := public.bank_digitos(segredo || 'cvv' || uid::text || card.id::text, 3);
+
+  -- O número derivado é a fonte de verdade: sincroniza o last4 guardado,
+  -- senão o cartão exibido na lista não bate com o número completo.
+  if card.last4 is distinct from v_last4 then
+    update public.bank_cards set last4 = v_last4 where id = card.id;
+    card.last4 := v_last4;
+  end if;
+
+  return jsonb_build_object(
+    'number',   regexp_replace(v_pan, '(\d{4})(\d{4})(\d{4})(\d{4})', '\1 \2 \3 \4'),
+    'last4',    v_last4,
+    'cvv',      v_cvv,
+    'brand',    card.brand,
+    'holder',   card.holder,
+    'expiry',   lpad(card.expiry_month::text, 2, '0') || '/' || card.expiry_year::text,
+    'expiry_month', card.expiry_month,
+    'expiry_year',  card.expiry_year,
+    'status',   card.status
+  );
+end;
+$$;
+
+revoke all on function public.bank_card_full() from public, anon;
+grant execute on function public.bank_card_full() to authenticated;
+grant execute on function public.bank_luhn(text) to authenticated;
+grant execute on function public.bank_digitos(text, int) to authenticated;
+
+-- ---------------------------------------------------------------------
 -- DEPÓSITO
 --   Registra como o dinheiro entrou. Não dá para "depositar" sem origem
 --   declarada; o valor entra na conta na hora.
