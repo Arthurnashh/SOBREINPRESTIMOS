@@ -24,13 +24,17 @@ const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
 /**
  * Movimentar dinheiro exige identidade verificada desde o KYC.
  * Aprova a verificação do titular antes dos testes de saída.
+ *
+ * O alvo é o DONO DA CONTA TESTADA, não "o primeiro perfil": assim que
+ * existir mais de um usuário, pegar o primeiro aprovaria o KYC de outra
+ * pessoa e o teste falharia por saldo/permissão sem motivo.
  */
-async function aprovarKyc() {
-  if (!SERVICE) return;
-  const u = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1`, {
-    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` },
-  }).then((r) => r.json());
-  const id = u?.[0]?.id;
+async function aprovarKyc(token) {
+  if (!SERVICE || !token) return;
+  const u = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: ANON, Authorization: `Bearer ${token}` },
+  }).then((r) => (r.ok ? r.json() : null));
+  const id = u?.id;
   if (!id) return;
 
   await fetch(`${SUPABASE_URL}/rest/v1/kyc_submissions?user_id=eq.${id}`, {
@@ -92,7 +96,7 @@ function checar(nome, ok, detalhe = "") {
   const j = await res.json();
   checar("login no Supabase", res.ok && !!j.access_token, j.error_description ?? "");
   userToken = j.access_token ?? "";
-  await aprovarKyc();
+  await aprovarKyc(userToken);
 
   const ref = SUPABASE_URL.replace("https://", "").split(".")[0];
   const nome = `sb-${ref}-auth-token`;

@@ -32,6 +32,19 @@ import {
 export class BankService {
   constructor(private readonly supabase: SupabaseClient) {}
 
+  /**
+   * Id do titular logado.
+   *
+   * As consultas abaixo filtram por ele de propósito. A RLS já garante que
+   * ninguém lê a conta alheia, mas sozinha ela devolve MAIS DE UMA linha para
+   * o admin (que enxerga todas as contas). Como usamos `.maybeSingle()`, isso
+   * virava erro e derrubava a página da conta. O filtro explícito resolve.
+   */
+  private async uid(): Promise<string | null> {
+    const { data } = await this.supabase.auth.getUser();
+    return data.user?.id ?? null;
+  }
+
   /** Abre a conta se ainda não existir. Idempotente. */
   async ensureAccount(): Promise<Account | null> {
     const existing = await this.getAccount();
@@ -43,9 +56,16 @@ export class BankService {
   }
 
   async getAccount(): Promise<Account | null> {
+    // Filtra explicitamente pelo titular. Sem isto a consulta depende de a RLS
+    // devolver exatamente uma linha — o que deixa de valer para o admin, que
+    // enxerga todas as contas, e fazia a página dele quebrar.
+    const uid = await this.uid();
+    if (!uid) return null;
+
     const { data } = await this.supabase
       .from("bank_accounts")
       .select("agency, number, check_digit, balance, overdraft, status, opened_at")
+      .eq("user_id", uid)
       .maybeSingle<{
         agency: string;
         number: string;
@@ -114,9 +134,13 @@ export class BankService {
   }
 
   async getCard(): Promise<Card | null> {
+    const uid = await this.uid();
+    if (!uid) return null;
+
     const { data } = await this.supabase
       .from("bank_cards")
       .select("id, last4, brand, holder, expiry_month, expiry_year, status")
+      .eq("user_id", uid)
       .maybeSingle<{
         id: string;
         last4: string;
@@ -542,9 +566,13 @@ export class BankService {
   }
 
   async getProfile(): Promise<BankProfile | null> {
+    const uid = await this.uid();
+    if (!uid) return null;
+
     const { data } = await this.supabase
       .from("bank_profiles")
       .select("address_line, address_num, complement, district, city, state, zip, occupation, income")
+      .eq("user_id", uid)
       .maybeSingle<{
         address_line: string | null;
         address_num: string | null;
@@ -588,9 +616,13 @@ export class BankService {
   }
 
   async getLimits(): Promise<Limits | null> {
+    const uid = await this.uid();
+    if (!uid) return null;
+
     const { data } = await this.supabase
       .from("bank_limits")
       .select("pix_per_tx, pix_per_day, transfer_per_tx, withdraw_per_day")
+      .eq("user_id", uid)
       .maybeSingle<{
         pix_per_tx: string | number;
         pix_per_day: string | number;

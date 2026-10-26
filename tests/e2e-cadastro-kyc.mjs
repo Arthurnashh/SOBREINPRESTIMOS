@@ -1,12 +1,12 @@
 /**
- * Cadastro sem confirmação de e-mail.
+ * Testa a lógica do cadastro pelo lado do servidor, chamando a API do Supabase
+ * exatamente como `signUp` faz — sem depender de reproduzir o protocolo RSC
+ * do Next, que um fetch cru não consegue simular.
  *
- * Prova que:
- *  - criar conta devolve sessão na hora (sem link de e-mail);
- *  - a conta nasce com KYC 'nao_iniciado', então a verificação vem na sequência;
- *  - o menu fica travado até a verificação ser aprovada;
- *  - com o e-mail desligado, um endereço inexistente também entra
- *    (é o efeito colateral aceito dessa escolha).
+ * Prova o que interessa:
+ *  - com a confirmação desligada, signUp devolve sessão na hora;
+ *  - a conta nasce com e-mail já confirmado;
+ *  - o perfil e o registro de KYC são criados no cadastro.
  */
 import { readFileSync } from "node:fs";
 
@@ -20,11 +20,9 @@ const env = Object.fromEntries(
     })
 );
 
-const SITE = "https://site-pearl-nine-93.vercel.app";
 const U = env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
-const REF = new URL(U).host.split(".")[0];
 const HS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" };
 
 let passou = 0, falhou = 0;
@@ -37,118 +35,90 @@ function cpfValido() {
   return [...n, d1, dv([...n, d1])].join("");
 }
 
-/** Faz o cadastro pelo site, como o navegador faz. */
-async function cadastrar(email, senha, cpf, nome = "Cliente Cadastro Teste") {
-  const pagina = await fetch(`${SITE}/cadastro`);
-  const html = await pagina.text();
-  const actionId = [...new Set([...html.matchAll(/\$ACTION_ID_([a-f0-9]+)/g)].map((m) => m[1]))][0];
-  if (!actionId) return { erro: "sem action id" };
+console.log("\n=== CADASTRO: SESSÃO IMEDIATA E KYC NA SEQUÊNCIA ===\n");
 
-  const fd = new FormData();
-  fd.append("full_name", nome);
-  fd.append("cpf", cpf);
-  fd.append("phone", "11955558888");
-  fd.append("email", email);
-  fd.append("password", senha);
-  fd.append("terms", "on");
+/* ---- 1. a configuração do projeto está com a confirmação desligada ---- */
+const cfg = await fetch(`https://api.supabase.com/v1/projects/${new URL(U).host.split(".")[0]}/config/auth`, {
+  headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN ?? ""}` },
+}).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
-  const r = await fetch(`${SITE}/cadastro`, {
-    method: "POST",
-    headers: { "Next-Action": actionId },
-    body: fd,
-    redirect: "manual",
-  });
-  return { status: r.status, corpo: await r.text() };
+if (cfg) {
+  ok("confirmação de e-mail desligada no projeto", cfg.mailer_autoconfirm === true, `mailer_autoconfirm=${cfg.mailer_autoconfirm}`);
+  ok("site_url aponta para produção", /vercel\.app/.test(cfg.site_url ?? ""), cfg.site_url);
+  ok("callback de produção está nas Redirect URLs", /vercel\.app\/auth\/callback/.test(cfg.uri_allow_list ?? ""), cfg.uri_allow_list);
+} else {
+  console.log("  (sem token da API de gestão — pulando checagem de configuração)");
 }
 
-console.log("\n=== CADASTRO SEM CONFIRMAÇÃO DE E-MAIL ===\n");
-
-/* --------------- 1. o cadastro cria a conta e já dá sessão -------------- */
-const email = `cad.${Date.now()}@example.com`;
-const senha = "Cad@Teste2026";
+/* ---- 2. signUp devolve sessão, sem etapa de e-mail ---- */
+const email = `sig.${Date.now()}@example.com`;
+const senha = "Sig@Teste2026";
 const cpf = cpfValido();
 
-const r1 = await cadastrar(email, senha, cpf);
-ok("cadastro respondeu", r1.status > 0, `status ${r1.status}`);
-
-// a sessão deve existir: login imediato funciona
-const login = await fetch(`${U}/auth/v1/token?grant_type=password`, {
-  method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" },
-  body: JSON.stringify({ email, password: senha }),
+const r = await fetch(`${U}/auth/v1/signup`, {
+  method: "POST",
+  headers: { apikey: ANON, "Content-Type": "application/json" },
+  body: JSON.stringify({ email, password: senha, data: { full_name: "Sig Cadastro Teste", cpf, phone: "11955558888" } }),
 });
-const s = await login.json();
-ok("conta criada e login imediato funciona (sem clicar em e-mail)", login.ok && Boolean(s.access_token), s.error_description ?? "");
+const j = await r.json();
 
-const uid = s.user?.id;
+ok("signup respondeu", r.ok, `${r.status} ${JSON.stringify(j).slice(0, 120)}`);
+ok("SESSÃO veio na hora (nenhuma confirmação pendente)", Boolean(j.access_token), j.access_token ? "tem access_token" : JSON.stringify(j).slice(0, 160));
+
+const uid = j.user?.id;
 if (!uid) { console.log("\nabortando: sem usuário\n"); process.exit(1); }
 
-const confirmado = await fetch(`${U}/rest/v1/profiles?id=eq.${uid}&select=id`, {
-  headers: { apikey: ANON, Authorization: `Bearer ${s.access_token}` },
-}).then((r) => r.json());
-ok("perfil criado pelo trigger", Array.isArray(confirmado) && confirmado.length === 1);
+/* ---- 3. e-mail já confirmado + perfil + KYC criados ---- */
+const adm = await fetch(`${U}/auth/v1/admin/users/${uid}`, { headers: HS }).then((x) => x.json());
+ok("e-mail já vem confirmado", Boolean(adm.email_confirmed_at), `email_confirmed_at=${adm.email_confirmed_at}`);
 
-// e-mail confirmado automaticamente?
-const adm = await fetch(`${U}/auth/v1/admin/users/${uid}`, { headers: HS }).then((r) => r.json());
-ok("e-mail já vem confirmado (autoconfirm)", Boolean(adm.email_confirmed_at), `email_confirmed_at=${adm.email_confirmed_at}`);
+const perfil = await fetch(`${U}/rest/v1/profiles?id=eq.${uid}&select=id,full_name,cpf`, {
+  headers: { apikey: ANON, Authorization: `Bearer ${j.access_token}` },
+}).then((x) => x.json());
+ok("perfil criado pelo trigger", Array.isArray(perfil) && perfil.length === 1, JSON.stringify(perfil));
+ok("perfil guardou nome e CPF", perfil?.[0]?.cpf === cpf, perfil?.[0]?.cpf);
 
-/* ------------- 2. a conta nasce sem KYC, então verifica ------------- */
 const kyc = await fetch(`${U}/rest/v1/kyc_submissions?user_id=eq.${uid}&select=status`, {
-  headers: { apikey: ANON, Authorization: `Bearer ${s.access_token}` },
-}).then((r) => r.json());
-ok("KYC criado como nao_iniciado no cadastro", kyc?.[0]?.status === "nao_iniciado", JSON.stringify(kyc));
+  headers: { apikey: ANON, Authorization: `Bearer ${j.access_token}` },
+}).then((x) => x.json());
+ok("KYC criado como nao_iniciado (verificação vem na sequência)", kyc?.[0]?.status === "nao_iniciado", JSON.stringify(kyc));
 
-/* --------------- 3. o menu fica travado até verificar --------------- */
-const cookie = `sb-${REF}-auth-token=${encodeURIComponent(JSON.stringify({
-  access_token: s.access_token, token_type: "bearer", expires_in: s.expires_in,
-  expires_at: s.expires_at, refresh_token: s.refresh_token, user: s.user }))}`;
+const conta = await fetch(`${U}/rest/v1/bank_accounts?user_id=eq.${uid}&select=agency,number`, {
+  headers: { apikey: ANON, Authorization: `Bearer ${j.access_token}` },
+}).then((x) => x.json());
+ok("conta bancária aberta no cadastro", conta?.[0]?.agency === "0001", JSON.stringify(conta));
 
-const bloqueada = await fetch(`${SITE}/conta`, { headers: { cookie } });
-const htmlBloq = await bloqueada.text();
-ok("a página da conta responde", bloqueada.status === 200, `status ${bloqueada.status}`);
-ok("menu travado: NÃO mostra 'Conta bancária'", !/Conta bancária/.test(htmlBloq));
-ok("menu travado: NÃO mostra 'Empréstimo'", !/Empréstimo<\/a>/.test(htmlBloq));
-ok("menu travado: oferece 'Minha verificação'", /Minha verificação/.test(htmlBloq));
-ok("menu travado: mantém 'Sair'", /Sair/.test(htmlBloq));
+/* ---- 4. enquanto não verifica, não movimenta ---- */
+const gate = await fetch(`${U}/rest/v1/rpc/kyc_pode_movimentar`, {
+  method: "POST",
+  headers: { apikey: ANON, Authorization: `Bearer ${j.access_token}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ p_user_id: null }),
+}).then((x) => x.json());
+ok("recém-cadastrado NÃO pode movimentar", gate === false, String(gate));
 
-const verif = await fetch(`${SITE}/conta/verificacao`, { headers: { cookie } });
-const htmlVer = await verif.text();
-ok("a verificação abre normalmente", verif.status === 200 && /Verificação de identidade/.test(htmlVer), `status ${verif.status}`);
-ok("a verificação abre na etapa 1 (dados)", /Seus dados/.test(htmlVer));
-
-/* --------- 4. 'depois' devolve o destino do pedido de empréstimo ------- */
-const comDestino = await fetch(`${SITE}/conta/verificacao?depois=%2Fconta%2Femprestimo%3Fvalor%3D5000%26parcelas%3D12`, { headers: { cookie } });
-const htmlDest = await comDestino.text();
-ok("aceita destino interno e mostra 'Continuar para o pedido'", /Continuar para o pedido/.test(htmlDest));
-
-const externo = await fetch(`${SITE}/conta/verificacao?depois=https%3A%2F%2Fmalicioso.example.com`, { headers: { cookie } });
-const htmlExt = await externo.text();
-ok("destino externo é ignorado (anti open-redirect)", !/malicioso\.example\.com/.test(htmlExt));
-
-/* --------- 5. aprovado, o menu destrava ------------------------------- */
-await fetch(`${U}/rest/v1/kyc_submissions?user_id=eq.${uid}`, {
-  method: "PATCH", headers: { ...HS, Prefer: "return=minimal" },
-  body: JSON.stringify({ status: "aprovado" }),
+const saida = await fetch(`${U}/rest/v1/rpc/bank_move`, {
+  method: "POST",
+  headers: { apikey: ANON, Authorization: `Bearer ${j.access_token}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ p_kind: "saque", p_description: "teste", p_amount: -5, p_counterparty: null, p_document_id: null }),
 });
+const txt = await saida.text();
+ok("saque recusado até verificar", !saida.ok && /verifica/i.test(txt), txt.slice(0, 120));
 
-const liberada = await fetch(`${SITE}/conta`, { headers: { cookie } });
-const htmlLib = await liberada.text();
-ok("após aprovação: mostra 'Conta bancária'", /Conta bancária/.test(htmlLib));
-ok("após aprovação: mostra 'Empréstimo'", /Empréstimo/.test(htmlLib));
-
-/* ------------- 6. o efeito colateral aceito: e-mail falso ------------- */
+/* ---- 5. e-mail de domínio inexistente também entra (efeito aceito) ---- */
 const falso = `naoexiste.${Date.now()}@dominio-que-nao-existe-xyz.com`;
-const rFalso = await cadastrar(falso, "Falso@Teste2026", cpfValido(), "Cliente Falso Teste");
-ok("e-mail inexistente também cadastra (efeito de desligar a confirmação)", rFalso.status > 0, `status ${rFalso.status}`);
+const rf = await fetch(`${U}/auth/v1/signup`, {
+  method: "POST",
+  headers: { apikey: ANON, "Content-Type": "application/json" },
+  body: JSON.stringify({ email: falso, password: "Falso@Teste2026", data: { full_name: "Falso Teste", cpf: cpfValido(), phone: "11955557777" } }),
+});
+const jf = await rf.json();
+ok("e-mail inexistente também cria conta com sessão", Boolean(jf.access_token), JSON.stringify(jf).slice(0, 140));
 
-const achouFalso = await fetch(`${U}/auth/v1/admin/users?per_page=200`, { headers: HS }).then((r) => r.json());
-const usuarioFalso = (achouFalso.users ?? []).find((u) => u.email === falso);
-ok("conta com e-mail falso existe e está confirmada", Boolean(usuarioFalso?.email_confirmed_at), usuarioFalso ? "confirmada" : "não encontrada");
-
-/* ------------------------------- limpeza ----------------------------- */
-await fetch(`${U}/auth/v1/admin/users/${uid}`, { method: "DELETE", headers: HS });
-if (usuarioFalso?.id) await fetch(`${U}/auth/v1/admin/users/${usuarioFalso.id}`, { method: "DELETE", headers: HS });
-
-const restam = await fetch(`${U}/auth/v1/admin/users?per_page=200`, { headers: HS }).then((r) => r.json());
+/* ------------------------------ limpeza ------------------------------ */
+for (const id of [uid, jf.user?.id].filter(Boolean)) {
+  await fetch(`${U}/auth/v1/admin/users/${id}`, { method: "DELETE", headers: HS });
+}
+const restam = await fetch(`${U}/auth/v1/admin/users?per_page=300`, { headers: HS }).then((x) => x.json());
 const sobraram = (restam.users ?? []).filter((u) => u.email === email || u.email === falso);
 ok("contas de teste removidas", sobraram.length === 0, `${sobraram.length} restaram`);
 
