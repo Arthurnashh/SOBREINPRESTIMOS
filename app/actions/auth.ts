@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isValidCpf, isValidEmail, isValidPhone, onlyDigits } from "@/lib/validation";
 import { safeAuthNext } from "@/lib/auth-redirect";
+import { mensagemDeErroDeLogin } from "@/lib/auth-errors";
 
 export type FormState = { error?: string; message?: string; fields?: Record<string, string> } | undefined;
 
@@ -25,10 +26,7 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    const msg = /confirm/i.test(error.message)
-      ? "Confirme seu e-mail pelo link que enviamos antes de entrar."
-      : "E-mail ou senha incorretos.";
-    return { error: msg, fields: { email } };
+    return { error: mensagemDeErroDeLogin(error.message), fields: { email } };
   }
 
   redirect(safeAuthNext(formData.get("next")));
