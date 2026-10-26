@@ -28,8 +28,16 @@ export async function createClient() {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
           );
-        } catch {
-          // Chamado de um Server Component: o middleware renova a sessão.
+        } catch (err) {
+          // Server Component não pode gravar cookie; o middleware renova a
+          // sessão. Se isto ocorrer numa Server Action, a sessão se perde sem
+          // erro visível — por isso o registro.
+          console.error(
+            "[supabase] falha ao gravar cookie de sessão:",
+            err instanceof Error ? err.message : String(err),
+            "| cookies:",
+            cookiesToSet.map((c) => c.name).join(",")
+          );
         }
       },
     },
