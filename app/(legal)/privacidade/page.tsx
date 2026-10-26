@@ -1,0 +1,46 @@
+import type { Metadata } from "next";
+import { COMPANY } from "@/lib/config";
+
+export const metadata: Metadata = { title: `Política de Privacidade | ${COMPANY.name}` };
+
+export default function PrivacyPage() {
+  return <>
+    <h1>Política de Privacidade</h1>
+    <p className="muted">Versão de 26 de outubro de 2026.</p>
+    <section className="stack">
+      <h2>1. Responsável e contato</h2>
+      <p>Esta política descreve o uso de dados no serviço {COMPANY.name}. A identificação do responsável e o canal de privacidade devem estar disponíveis antes de uma operação pública com dados pessoais.</p>
+      {COMPANY.privacyEmail ? <p>Solicitações de privacidade: <a href={`mailto:${COMPANY.privacyEmail}`}>{COMPANY.privacyEmail}</a>.</p>
+        : <div className="alert alert-warn">O canal de privacidade ainda não foi configurado. Este ambiente não está preparado para operação pública com dados pessoais reais.</div>}
+    </section>
+    <section className="stack">
+      <h2>2. Dados e finalidades</h2>
+      <p>O cadastro solicita nome, CPF, telefone e e-mail para identificar a conta e relacionar solicitações ao usuário. O Supabase gerencia a autenticação e a senha. Os pedidos registram valor, prazo, status, condições, observações e datas para permitir seu acompanhamento e análise administrativa.</p>
+      <p>A recuperação de senha utiliza o e-mail cadastrado. Uma sessão autenticada é necessária para acessar a conta. Esta versão não executa consultas ao SCR ou a bureaus de crédito.</p>
+    </section>
+    <section className="stack">
+      <h2>3. Demonstração e dados bancários</h2>
+      <p>Em demonstração, os valores e dados bancários são fictícios. O cookie da demonstração guarda o identificador do usuário, o total fictício utilizado e até oito movimentações de teste. Não guarda a chave PIX nem a mensagem. A chave e a mensagem são processadas para exibir o resultado da operação: use dados de teste.</p>
+      <p>Em uma integração real, a instituição responsável recebe os dados necessários à operação solicitada. Essa operação depende de configuração e informações específicas do parceiro.</p>
+    </section>
+    <section className="stack" id="cookies">
+      <h2>4. Cookies e armazenamento local</h2>
+      <p>Utilizamos somente cookies necessários. Nenhum cookie de publicidade ou análise de navegação está instalado nesta versão.</p>
+      <ul>
+        <li><strong>Autenticação (Supabase):</strong> mantém e renova a sessão de acesso, conforme a configuração do provedor.</li>
+        <li><strong>site-cookie-notice:</strong> registra a leitura do aviso por até 180 dias.</li>
+        <li><strong>demo-wallet-v1:</strong> mantém a simulação neste navegador por até sete dias desde a última simulação de PIX.</li>
+      </ul>
+      <p>O botão “Cookies” permite reabrir o aviso. Você pode excluir ou bloquear os cookies nas configurações do navegador; isso pode encerrar a sessão e apagar a demonstração. Novos cookies opcionais deverão depender de uma escolha prévia e específica.</p>
+    </section>
+    <section className="stack">
+      <h2>5. Acesso, provedores e conservação</h2>
+      <p>O usuário acessa seus próprios dados; administradores autorizados podem consultar os perfis e pedidos. O Supabase fornece autenticação e banco de dados. O provedor de hospedagem processa as requisições necessárias ao funcionamento do site. As fontes tipográficas são carregadas do Google Fonts, que recebe dados técnicos da conexão, como o endereço IP.</p>
+      <p>Os cadastros e pedidos permanecem no banco até exclusão administrativa ou da conta, observadas as obrigações aplicáveis à operação. Antes da produção, o responsável deverá definir e divulgar os prazos de retenção, as bases legais de cada finalidade e os provedores efetivamente utilizados, incluindo eventuais transferências internacionais.</p>
+    </section>
+    <section className="stack">
+      <h2>6. Suas solicitações</h2>
+      <p>Você pode solicitar informações sobre o tratamento, acesso, correção e exclusão dos dados, além dos demais direitos aplicáveis, pelo canal de privacidade informado nesta página. Podemos solicitar informações proporcionais para confirmar sua identidade. Não envie senhas por e-mail.</p>
+    </section>
+  </>;
+}
