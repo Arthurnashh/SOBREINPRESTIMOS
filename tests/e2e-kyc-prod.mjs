@@ -85,7 +85,13 @@ ok("menciona comprovante de endereço", /Comprovante de endere/.test(bundles));
 ok("menciona selfie com documento", /[Ss]elfie/.test(html + bundles));
 ok("fala da prova de vida", /Prova de vida/.test(bundles));
 ok("fala dos cinco ângulos", /Vamos capturar/.test(bundles) && /cinco/.test(bundles));
-ok("mostra o enquadramento ao vivo", /Enquadramento bom/.test(bundles));
+// A dica ao vivo mudou de "Enquadramento bom" para "Tudo certo — <ação>",
+// justamente para não sumir com a instrução do ângulo quando o quadro fica bom.
+ok("mostra o enquadramento ao vivo e o que fazer", /Tudo certo/.test(bundles));
+// E a orientação por ângulo continua no bundle (virar, sorrir, aproximar).
+ok("diz para virar a cabeça", /[Vv]ire/.test(bundles));
+ok("diz para sorrir", /[Ss]orria|sorriso confirmado/.test(bundles));
+ok("diz para aproximar", /[Aa]proxime/.test(bundles));
 ok("tem o botão de escolher arquivo", /Escolher arquivo/.test(bundles));
 
 // menu
