@@ -37,15 +37,39 @@ const ok = (n, c, d = "") => {
 const EMAIL = `comum.${Date.now()}@example.com`;
 const SENHA = "Comum@Teste2026";
 
-/** Cria usuário já confirmado. */
+/** Cria usuário já confirmado, com CPF válido (o trigger do cadastro exige). */
 async function criar(email, senha) {
   const r = await fetch(`${URL_BASE}/auth/v1/admin/users`, {
     method: "POST",
     headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password: senha, email_confirm: true }),
+    body: JSON.stringify({
+      email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { full_name: "Cliente Comum Teste", cpf: CPF_COMUM, phone: "11999998888" },
+      data: { full_name: "Cliente Comum Teste", cpf: CPF_COMUM, phone: "11999998888" },
+    }),
   });
   return { ok: r.ok, data: await r.json() };
 }
+
+/**
+ * CPF válido gerado na hora (dígitos verificadores corretos), para não
+ * colidir com o do admin nem com execuções anteriores.
+ */
+function cpfValido() {
+  const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+  const dv = (base) => {
+    const soma = base.reduce((a, d, i) => a + d * (base.length + 1 - i), 0);
+    const r = (soma * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  const d1 = dv(n);
+  const d2 = dv([...n, d1]);
+  return [...n, d1, d2].join("");
+}
+
+const CPF_COMUM = cpfValido();
 
 async function logar(email, senha) {
   const r = await fetch(`${URL_BASE}/auth/v1/token?grant_type=password`, {
@@ -101,6 +125,25 @@ const criado = await criar(EMAIL, SENHA);
 ok("usuário comum criado", criado.ok, JSON.stringify(criado.data).slice(0, 90));
 const uidComum = criado.data?.id;
 
+// o perfil pode não vir do metadata; garante direto na tabela
+if (uidComum) {
+  await fetch(`${URL_BASE}/rest/v1/profiles?id=eq.${uidComum}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SERVICE,
+      Authorization: `Bearer ${SERVICE}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      full_name: "Cliente Comum Teste",
+      cpf: CPF_COMUM,
+      phone: "11999998888",
+      is_admin: false,
+    }),
+  });
+}
+
 const sComum = await logar(EMAIL, SENHA);
 ok("login do usuário comum funcionou", Boolean(sComum.access_token), sComum.error_description ?? "");
 
@@ -111,8 +154,13 @@ const rComum = await fetch(`${SITE}/conta/banco`, {
 const htmlComum = await rComum.text();
 const menuComum = menuDe(htmlComum);
 
-ok("comum NÃO vê 'Administração' no menu", !/Administração/.test(menuComum));
-ok("comum não tem link /admin no menu", !/href="\/admin"/.test(menuComum));
+// Se o login falhou, a página é um redirect para /entrar e o menu vem vazio:
+// aí os testes abaixo passariam por engano. Exigimos o menu de verdade.
+const menuComumReal = menuComum.length > 0 && /Conta bancária/.test(menuComum);
+ok("menu do usuário comum foi realmente lido", menuComumReal, `${menuComum.length} chars`);
+
+ok("comum NÃO vê 'Administração' no menu", menuComumReal && !/Administração/.test(menuComum));
+ok("comum não tem link /admin no menu", menuComumReal && !/href="\/admin"/.test(menuComum));
 ok("comum vê 'Conta bancária'", /Conta bancária/.test(menuComum));
 ok("comum vê 'Empréstimo'", /Empréstimo/.test(menuComum));
 
