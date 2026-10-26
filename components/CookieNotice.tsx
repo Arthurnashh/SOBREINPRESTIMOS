@@ -24,7 +24,7 @@ export default function CookieNotice() {
     <section className="cookie-notice" aria-labelledby="cookie-title">
       <div>
         <h2 id="cookie-title">Seus dados e cookies</h2>
-        <p>Usamos apenas cookies necessários para autenticação, para lembrar este aviso e para a conta demonstrativa.
+        <p>Usamos apenas cookies necessários para autenticação e para lembrar este aviso.
           Não utilizamos cookies de publicidade ou análise de navegação.</p>
       </div>
       <div className="cookie-actions">

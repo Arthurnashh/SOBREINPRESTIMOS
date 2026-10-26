@@ -43,8 +43,20 @@ export async function decideLoan(_prev: AdminFormState, formData: FormData): Pro
       p_note: note,
     });
     if (error) return { error: "Não foi possível marcar como liberado." };
+
+    // O valor liberado entra na conta bancária do cliente. A função é
+    // idempotente: uma segunda chamada para o mesmo pedido não credita de novo.
+    const { error: erroCredito } = await supabase.rpc("bank_credit_loan", { p_loan_id: id });
     revalidatePath("/admin");
-    return { success: "Pedido marcado como liberado." };
+    revalidatePath("/admin/pedido/" + id);
+
+    if (erroCredito) {
+      return {
+        success:
+          "Pedido marcado como liberado, mas o crédito na conta falhou. Rode o crédito novamente pelo pedido.",
+      };
+    }
+    return { success: "Pedido liberado e valor creditado na conta do cliente." };
   }
 
   if (decision === "aprovar") {

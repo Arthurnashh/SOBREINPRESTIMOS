@@ -19,9 +19,9 @@ export default function PrivacyPage() {
       <p>A recuperação de senha utiliza o e-mail cadastrado. Uma sessão autenticada é necessária para acessar a conta. Esta versão não executa consultas ao SCR ou a bureaus de crédito.</p>
     </section>
     <section className="stack">
-      <h2>3. Demonstração e dados bancários</h2>
-      <p>Em demonstração, os valores e dados bancários são fictícios. O cookie da demonstração guarda o identificador do usuário, o total fictício utilizado e até oito movimentações de teste. Não guarda a chave PIX nem a mensagem. A chave e a mensagem são processadas para exibir o resultado da operação: use dados de teste.</p>
-      <p>Em uma integração real, a instituição responsável recebe os dados necessários à operação solicitada. Essa operação depende de configuração e informações específicas do parceiro.</p>
+      <h2>3. Dados bancários</h2>
+      <p>Para operar a conta de pagamento, registramos o número da conta, agência, saldo, extrato de movimentações, chaves PIX cadastradas, dados do cartão virtual e boletos pagos. Esses dados ficam vinculados à sua conta e são usados para executar as operações que você solicita, atender obrigações legais e prevenir fraudes.</p>
+      <p>O número completo do cartão e o código de segurança não são armazenados por nós: são mantidos pela instituição emissora, que é a responsável pela emissão e pelo processamento das compras.</p>
     </section>
     <section className="stack" id="cookies">
       <h2>4. Cookies e armazenamento local</h2>
@@ -29,9 +29,8 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Autenticação (Supabase):</strong> mantém e renova a sessão de acesso, conforme a configuração do provedor.</li>
         <li><strong>site-cookie-notice:</strong> registra a leitura do aviso por até 180 dias.</li>
-        <li><strong>demo-wallet-v1:</strong> mantém a simulação neste navegador por até sete dias desde a última simulação de PIX.</li>
       </ul>
-      <p>O botão “Cookies” permite reabrir o aviso. Você pode excluir ou bloquear os cookies nas configurações do navegador; isso pode encerrar a sessão e apagar a demonstração. Novos cookies opcionais deverão depender de uma escolha prévia e específica.</p>
+      <p>O botão “Cookies” permite reabrir o aviso. Você pode excluir ou bloquear os cookies nas configurações do navegador; isso encerra a sessão. O saldo e o histórico da conta não ficam no navegador.</p>
     </section>
     <section className="stack">
       <h2>5. Acesso, provedores e conservação</h2>

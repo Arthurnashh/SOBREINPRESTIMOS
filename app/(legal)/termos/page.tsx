@@ -14,9 +14,9 @@ export default function TermsPage() {
       <p>Quando houver integração bancária efetivamente contratada, a instituição responsável e as condições completas deverão ser identificadas antes de qualquer contratação.</p>
     </section>
     <section className="stack">
-      <h2>2. Ambiente de demonstração</h2>
-      <p>Quando a indicação de demonstração estiver visível, saldo, agência, conta, extrato, cartão e PIX são fictícios. O cartão não permite compras. O comprovante simulado não comprova pagamento nem transferência. Nenhum valor é liberado ou movimentado por essa simulação.</p>
-      <p>O histórico simulado fica neste navegador por até sete dias. Excluir os cookies restaura o saldo inicial. Use dados de teste nas chaves PIX e não compartilhe comprovantes demonstrativos como se fossem reais.</p>
+      <h2>2. Conta de pagamento</h2>
+      <p>A conta digital e os meios de pagamento — PIX, transferências, cartão virtual e pagamento de boletos — são oferecidos no âmbito da parceria com a instituição financeira identificada no rodapé e no contrato. O saldo e o histórico ficam registrados na conta do titular.</p>
+      <p>Você é responsável por manter suas credenciais em segurança e por conferir os dados do destinatário antes de confirmar qualquer operação. Transferências e pagamentos confirmados seguem as regras do arranjo de pagamento aplicável e podem não ser reversíveis.</p>
     </section>
     <section className="stack">
       <h2>3. Cadastro e acesso</h2>

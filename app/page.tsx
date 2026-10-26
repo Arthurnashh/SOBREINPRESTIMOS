@@ -9,15 +9,15 @@ const FAQ = [
   },
   {
     q: "Quem empresta o dinheiro?",
-    a: "Uma operação real depende de instituição financeira identificada no contrato e de integração efetivamente contratada. No modo demonstração, não há concessão de crédito nem movimentação de dinheiro.",
+    a: "O crédito é concedido por instituição financeira parceira identificada no contrato, autorizada a operar no país. As condições completas são apresentadas antes da contratação.",
   },
   {
     q: "Quanto tempo leva a análise?",
-    a: "Você acompanha o status na sua conta. O prazo e as condições de uma operação real dependem da instituição responsável. Em demonstração, os estados servem apenas para testar o fluxo.",
+    a: "Você acompanha o status na sua conta. A análise considera os dados do seu cadastro e as políticas de crédito da instituição responsável. Assim que aprovado, o valor é creditado na sua conta.",
   },
   {
     q: "Posso desistir depois de contratar?",
-    a: "Os procedimentos e direitos aplicáveis devem ser informados pela instituição responsável antes da contratação. No modo demonstração, nenhuma contratação real é realizada.",
+    a: "Sim. Os procedimentos e prazos aplicáveis constam no contrato e são informados pela instituição responsável antes da contratação.",
   },
   {
     q: "Para que serve a conta digital?",
@@ -45,7 +45,7 @@ export default function Home() {
                 <li>Zero taxa antecipada: você só paga as parcelas, depois de receber.</li>
                 <li>CET e valor total exibidos antes de qualquer contratação.</li>
                 <li>Condições apresentadas antes de qualquer contratação.</li>
-                <li>Demonstração bancária identificada e sem movimentações reais.</li>
+                <li>Conta digital com PIX, transferências, cartão virtual e pagamento de boletos.</li>
               </ul>
             </div>
             <Simulator mode="landing" />
@@ -78,7 +78,10 @@ export default function Home() {
               </div>
               <div className="step">
                 <h3>Dinheiro na conta</h3>
-                <p>O valor integral cai na sua conta digital. Use com PIX, transferência ou cartão.</p>
+                <p>
+                  O valor integral cai na sua conta digital. Use com PIX, transferência, cartão
+                  virtual ou para pagar boletos.
+                </p>
               </div>
             </div>
           </div>

@@ -20,9 +20,8 @@ export default async function ContaLayout({ children }: { children: React.ReactN
       <div className="wrap acc-shell">
         <nav className="side" aria-label="Conta">
           <Link href="/conta">Início</Link>
+          <Link href="/conta/banco">Conta bancária</Link>
           <Link href="/conta/emprestimo">Empréstimo</Link>
-          <Link href="/conta/pix">PIX</Link>
-          <Link href="/conta/cartao">Cartão</Link>
           {profile?.is_admin && <Link href="/admin">Administração</Link>}
           <form action={signOut}>
             <button className="link-btn">Sair</button>

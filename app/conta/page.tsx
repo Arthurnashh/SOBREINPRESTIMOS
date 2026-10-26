@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { cancelLoan } from "@/app/actions/loans";
 import { requireSession, STATUS_LABEL, type LoanRequest } from "@/lib/account";
-import { getBanking } from "@/lib/banking";
+import { getBanking, KIND_LABEL } from "@/lib/banking";
 import { brl, date, pct } from "@/lib/format";
 import { simulate } from "@/lib/loan";
+
+export const dynamic = "force-dynamic";
 
 export default async function ContaPage({
   searchParams,
@@ -11,18 +13,19 @@ export default async function ContaPage({
   searchParams: Promise<{ pedido?: string }>;
 }) {
   const { pedido } = await searchParams;
-  const { supabase, profile, user } = await requireSession();
-  const banking = getBanking(user.id);
-  const extId = profile?.external_account_id ?? null;
+  const { supabase, profile } = await requireSession();
+  const bank = getBanking(supabase);
 
-  const [{ data: loans }, account, statement] = await Promise.all([
+  await bank.ensureAccount();
+
+  const [{ data: loans }, account, extrato] = await Promise.all([
     supabase
       .from("loan_requests")
       .select("id, amount, installments, status, monthly_rate, installment_value, cet_yearly, decision_note, created_at")
       .order("created_at", { ascending: false })
       .returns<LoanRequest[]>(),
-    banking.getAccount(extId),
-    banking.getStatement(extId),
+    bank.getAccount(),
+    bank.getStatement(5),
   ]);
 
   const firstName = profile?.full_name.split(" ")[0] ?? "";
@@ -46,22 +49,22 @@ export default async function ContaPage({
 
       <div className="grid-2">
         <section className="card">
-          <div className="kpi-label">{banking.isDemo ? "Saldo fictício · demonstração" : "Saldo disponível"}</div>
+          <div className="kpi-label">Saldo disponível</div>
           {account ? (
             <>
               <div className="kpi">{brl(account.balance)}</div>
               <p className="muted" style={{ marginTop: 6 }}>
-                Ag. {account.agency} · Conta {account.number}
+                Ag. {account.agency} · Conta {account.number}-{account.checkDigit}
               </p>
-              <Link href="/conta/pix" className="btn btn-ghost" style={{ marginTop: 16 }}>
-                {banking.isDemo ? "Simular PIX" : "Fazer PIX"}
+              <Link href="/conta/banco" className="btn btn-ghost" style={{ marginTop: 16 }}>
+                Abrir conta bancária
               </Link>
             </>
           ) : (
             <>
               <div className="kpi muted">—</div>
               <p className="muted" style={{ marginTop: 6 }}>
-                Sua conta digital é aberta pela instituição parceira após a validação do cadastro.
+                Sua conta está sendo preparada. Recarregue a página em instantes.
               </p>
             </>
           )}
@@ -70,7 +73,9 @@ export default async function ContaPage({
         <section className="card">
           <div className="kpi-label">Crédito</div>
           <div className="kpi">até {brl(20000)}</div>
-          <p className="muted" style={{ marginTop: 6 }}>Sem taxa antecipada. Sujeito a análise.</p>
+          <p className="muted" style={{ marginTop: 6 }}>
+            Sem taxa antecipada. Sujeito a análise.
+          </p>
           {!hasOpen && (
             <Link href="/conta/emprestimo" className="btn btn-primary" style={{ marginTop: 16 }}>
               Simular e pedir
@@ -120,17 +125,23 @@ export default async function ContaPage({
       </section>
 
       <section className="card">
-        <h2 style={{ fontSize: 22, marginBottom: 8 }}>{banking.isDemo ? "Extrato demonstrativo" : "Extrato"}</h2>
-        {banking.isDemo && <p className="fine">Movimentações fictícias. Mostramos as oito simulações de PIX mais recentes neste navegador.</p>}
-        {!statement.length ? (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <h2 style={{ fontSize: 22, marginBottom: 8 }}>Últimas movimentações</h2>
+          <Link href="/conta/banco" className="link-btn">
+            Ver extrato completo
+          </Link>
+        </div>
+        {!extrato.length ? (
           <div className="empty">Sem movimentações.</div>
         ) : (
           <ul className="list">
-            {statement.map((t) => (
+            {extrato.map((t) => (
               <li key={t.id}>
                 <div>
                   <div>{t.description}</div>
-                  <div className="fine">{date(t.date)}</div>
+                  <div className="fine">
+                    {KIND_LABEL[t.kind]} · {date(t.createdAt)}
+                  </div>
                 </div>
                 <span className={t.amount >= 0 ? "in" : "out"}>
                   {t.amount >= 0 ? "+ " : "− "}

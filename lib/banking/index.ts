@@ -1,9 +1,14 @@
-import { createDemoProvider } from "./demo";
-import { partnerProvider } from "./partner";
-import type { BankingProvider } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { BankService } from "./service";
 
-export function getBanking(demoUserId?: string): BankingProvider {
-  return process.env.BAAS_PROVIDER === "parceiro" ? partnerProvider : createDemoProvider(demoUserId);
+/**
+ * Toda leitura de saldo e toda movimentação passam pela conta do cliente
+ * no Postgres. Não existe estado bancário no navegador.
+ */
+export function getBanking(supabase: SupabaseClient): BankService {
+  return new BankService(supabase);
 }
 
+export { BankService };
+export { KIND_LABEL, mensagemBanco } from "./types";
 export type * from "./types";
