@@ -147,6 +147,26 @@ if (uidComum) {
 const sComum = await logar(EMAIL, SENHA);
 ok("login do usuário comum funcionou", Boolean(sComum.access_token), sComum.error_description ?? "");
 
+// O menu fica travado enquanto a verificação de identidade não é aprovada.
+// Aprovamos aqui para poder comparar o menu COMPLETO de um usuário comum com
+// o do admin — que é o que esta suíte existe para checar. Sem isso o menu
+// viria reduzido e as asserções passariam por vacuidade.
+{
+  const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+  const HS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
+  const eu = await fetch(`${URL_BASE}/auth/v1/user`, {
+    headers: { apikey: ANON, Authorization: `Bearer ${sComum.access_token}` },
+  }).then((r) => (r.ok ? r.json() : null));
+  if (eu?.id) {
+    await fetch(`${URL_BASE}/rest/v1/kyc_submissions?user_id=eq.${eu.id}`, {
+      method: "PATCH",
+      headers: { ...HS, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "aprovado" }),
+    });
+  }
+  ok("KYC do usuário comum aprovado para comparar o menu completo", Boolean(eu?.id));
+}
+
 const rComum = await fetch(`${SITE}/conta/banco`, {
   headers: { cookie: cookieDe(sComum) },
   redirect: "manual",

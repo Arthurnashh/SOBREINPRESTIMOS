@@ -89,9 +89,12 @@ ok("mostra o enquadramento ao vivo", /Enquadramento bom/.test(bundles));
 ok("tem o botão de escolher arquivo", /Escolher arquivo/.test(bundles));
 
 // menu
+// Enquanto a verificação não é aprovada, o menu fica travado de propósito:
+// só a própria verificação e o sair. Este cliente é recém-criado.
 const menu = (html.match(/<nav class="side"[\s\S]*?<\/nav>/) ?? [""])[0];
 ok("menu tem 'Minha verificação'", /Minha verificação/.test(menu));
-ok("menu mantém 'Conta bancária'", /Conta bancária/.test(menu));
+ok("menu travado esconde 'Conta bancária' antes de aprovar", !/Conta bancária/.test(menu));
+ok("menu travado mantém 'Sair'", /Sair/.test(menu));
 
 // painel admin (usa o token do admin)
 const a = await fetch(`${SITE}/admin/kyc`, { headers: { cookie: cookieAdmin } });
