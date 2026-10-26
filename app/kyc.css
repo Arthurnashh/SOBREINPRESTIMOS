@@ -61,6 +61,21 @@
   font-size: 12px;
 }
 
+/*
+ * Etapa ainda bloqueada. Sem esta regra ela ficava idêntica às liberadas: a
+ * pessoa clicava, nada acontecia e a tela parecia quebrada. Agora fica
+ * visivelmente apagada e com o cursor de proibido.
+ */
+.kyc-etapa.travada {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--kyc-soft);
+}
+.kyc-etapa.travada .num {
+  background: #e7e7e7;
+  color: #8a8a8a;
+}
+
 .kyc-etapa.atual {
   border-color: var(--brand, #0e5a43);
   background: var(--kyc-soft);
