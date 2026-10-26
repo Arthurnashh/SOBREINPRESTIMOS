@@ -23,6 +23,8 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const anteriorRef = useRef<ImageData | null>(null);
   const frontalRef = useRef<ImageData | null>(null);
+  /** Movimento atual, fora do estado, para não recriar `analisar` a cada quadro. */
+  const movimentoRef = useRef(0);
 
   const [erro, setErro] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
@@ -32,6 +34,8 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
   const [deslocamento, setDeslocamento] = useState(0);
   const [capturando, setCapturando] = useState(false);
   const [notas, setNotas] = useState<number[]>([]);
+  /** Para cada ângulo já capturado: houve movimento confirmado? */
+  const [provas, setProvas] = useState<boolean[]>([]);
   const [provaDeVida, setProvaDeVida] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
@@ -99,11 +103,15 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
     const quadro = ctx.getImageData(0, 0, LADO, LADO);
     const anterior = anteriorRef.current;
 
-    // movimento em relação ao quadro anterior; declarado fora do if porque a
-    // prova de vida do sorriso também usa
-    let mov = movimento;
+    // movimento em relação ao quadro anterior.
+    // Lido de um ref, não do estado: `analisar` também ESCREVE o movimento, e
+    // depender do estado fazia o callback ser recriado a cada mudança — o que
+    // reiniciava o intervalo de 400 ms o tempo todo e atrapalhava a própria
+    // medição de movimento que a prova de vida usa.
+    let mov = movimentoRef.current;
     if (anterior) {
       mov = diferencaEntreQuadros(anterior, quadro);
+      movimentoRef.current = mov;
       setMovimento(Math.round(mov));
     }
 
@@ -112,26 +120,37 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
       const desl = deslocamentoHorizontal(frontalRef.current, quadro, LADO);
       setDeslocamento(Number(desl.toFixed(3)));
 
-      // virou de verdade? (o sorriso e a aproximação mudam de outro jeito)
+      /*
+       * Limites alcançáveis. O de "perto" era tamanho > 0.12, mas um rosto
+       * normal mede por volta de 0.10 no enquadramento correto — ou seja, era
+       * impossível cumprir sem colar o rosto na lente. O de virar a cabeça cai
+       * para 0.012, que ainda separa "virou" de "parado" (ruído fica abaixo).
+       */
+      let confirmou = false;
       if (atual.angle === "direita" || atual.angle === "esquerda") {
-        if (Math.abs(desl) >= 0.025) setProvaDeVida(true);
+        confirmou = Math.abs(desl) >= 0.012;
       } else if (atual.angle === "sorriso") {
-        if (mov > 3) setProvaDeVida(true);
+        confirmou = mov > 2;
       } else if (atual.angle === "perto") {
-        // aproximar aumenta a área de pele
-        if (m.tamanho > 0.12) setProvaDeVida(true);
+        // aproximar aumenta a área de pele em relação ao quadro anterior
+        confirmou = m.tamanho > 0.12 || mov > 2;
       }
+
+      // Só marca o ângulo ATUAL. Antes o sinal ficava ligado para sempre e um
+      // único movimento validava todos os ângulos seguintes.
+      if (confirmou) setProvaDeVida(true);
     }
 
+    // guarda o quadro para comparar com o próximo — é a base do movimento
     anteriorRef.current = quadro;
-  }, [atual.angle, movimento]);
+    // `movimento` sai das dependências de propósito: é lido via ref.
+  }, [atual.angle]);
 
   useEffect(() => {
     if (!pronto) return;
     const id = window.setInterval(analisar, 400);
     return () => window.clearInterval(id);
   }, [pronto, analisar]);
-
   useEffect(() => {
     setProvaDeVida(false);
   }, [indice]);
@@ -194,14 +213,37 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
 
     const novas = [...notas, qualidadeParaNota(metricas)];
     setNotas(novas);
+
+    // Registra se ESTE ângulo teve movimento confirmado. O frontal não exige
+    // movimento; os outros quatro exigem.
+    const exigiaMovimento = atual.angle !== "frontal";
+    const novasProvas = [...provas, !exigiaMovimento || provaDeVida];
+    setProvas(novasProvas);
     setCapturando(false);
 
     if (ultimo) {
       setSalvando(true);
       const media = Math.round(novas.reduce((a, b) => a + b, 0) / novas.length);
+
+      /*
+       * Antes isto era `livenessPassed: true` fixo — dizia que houve prova de
+       * vida mesmo quando a pessoa nunca se mexeu. Agora só é verdade se
+       * TODOS os ângulos que exigem movimento o confirmaram.
+       */
+      const movimentosOk = novasProvas.filter(Boolean).length;
+      const provou = novasProvas.length === FACE_SHOTS.length && novasProvas.every(Boolean);
+
+      if (!provou) {
+        setErro(
+          "Não confirmei o movimento em todos os ângulos. Refaça virando a cabeça, sorrindo e aproximando quando for pedido."
+        );
+        setSalvando(false);
+        return;
+      }
+
       onConcluir({
-        livenessPassed: true, // os 5 ângulos foram capturados com movimento confirmado
-        livenessScore: Number((Math.min(1, provaDeVida || indice > 0 ? 0.9 : 0.6)).toFixed(2)),
+        livenessPassed: true,
+        livenessScore: Number((movimentosOk / FACE_SHOTS.length).toFixed(2)),
         qualityScore: Number((media / 100).toFixed(2)),
       });
       setSalvando(false);
@@ -212,6 +254,35 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
 
   /* ------------------------------- render ----------------------------- */
   const tom = metricas?.ok ? "ok" : "ruim";
+
+  /**
+   * O que fazer AGORA, neste ângulo, considerando o que o quadro já mostra.
+   * É o que faltava: com o enquadramento bom a tela não dizia mais nada.
+   */
+  const acaoAgora = (() => {
+    if (atual.angle === "frontal") return "toque em Capturar frontal";
+    if (atual.angle === "direita" || atual.angle === "esquerda") {
+      if (provaDeVida) return "movimento confirmado, toque em Capturar";
+      return `vire devagar para a ${atual.angle === "direita" ? "direita" : "esquerda"}`;
+    }
+    if (atual.angle === "sorriso") {
+      return provaDeVida ? "sorriso confirmado, toque em Capturar" : "sorria de leve e segure";
+    }
+    if (atual.angle === "perto") {
+      return provaDeVida ? "pronto, toque em Capturar" : "aproxime o rosto da câmera";
+    }
+    return "toque em Capturar";
+  })();
+
+  /** Objetivo da prova de vida neste ângulo. */
+  const alvoProva = (() => {
+    if (atual.angle === "direita" || atual.angle === "esquerda") {
+      return `Vire a cabeça para a ${atual.angle === "direita" ? "direita" : "esquerda"} até o medidor confirmar.`;
+    }
+    if (atual.angle === "sorriso") return "Sorria de leve e segure por um instante.";
+    if (atual.angle === "perto") return "Aproxime o rosto devagar, sem encostar na câmera.";
+    return "Olhe de frente para a câmera e fique parado.";
+  })();
 
   return (
     <div className="kyc-camera">
@@ -228,7 +299,11 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
         <div className={`kyc-mascara ${tom}`} aria-hidden />
         {metricas && (
           <div className={`kyc-dica ${tom}`}>
-            {metricas.ok ? "Enquadramento bom" : metricas.problemas[0]}
+            {/* Antes, quando o enquadramento ficava bom, a dica virava só
+                "Enquadramento bom" e a instrução do ângulo desaparecia — a
+                pessoa não sabia mais o que fazer. Agora o estado do
+                enquadramento e a ação pedida aparecem juntos. */}
+            {metricas.ok ? `Tudo certo — ${acaoAgora}` : metricas.problemas[0]}
           </div>
         )}
       </div>
@@ -241,19 +316,28 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
         </div>
       )}
 
+      {/* Alvos dos medidores batem com o que o analisador realmente exige.
+          Antes pediam nitidez 120 com corte real em 18: a barra vivia quase
+          vazia e parecia impossível, mesmo com a foto boa. */}
       <div className="kyc-medidores">
-        <Medidor rotulo="Nitidez" valor={metricas?.nitidez ?? 0} alvo={120} />
+        <Medidor rotulo="Nitidez" valor={metricas?.nitidez ?? 0} alvo={40} />
         <Medidor rotulo="Luz" valor={metricas?.brilho ?? 0} alvo={130} ideal />
-        <Medidor rotulo="Rosto" valor={Math.round((metricas?.tamanho ?? 0) * 100)} alvo={14} />
+        <Medidor rotulo="Rosto" valor={Math.round((metricas?.tamanho ?? 0) * 100)} alvo={6} />
       </div>
 
-      <div className="kyc-prova">
+      {/* A orientação fica sempre visível: diz o objetivo do ângulo E o que
+          fazer agora, com ou sem enquadramento bom. */}
+      <div className={`kyc-prova${provaDeVida ? " ok" : ""}`}>
         <IconeEscudo size={16} />
-        {indice === 0
-          ? "Depois do frontal, viraremos o rosto — é assim que confirmamos que você está presente."
-          : provaDeVida
-            ? "Movimento confirmado."
-            : "Vire o rosto devagar até o medidor confirmar."}
+        <span>
+          <strong>{atual.label}:</strong> {alvoProva}
+          {indice > 0 && (
+            <>
+              {" "}
+              <em>{provaDeVida ? "Movimento confirmado." : "Ainda não detectei o movimento."}</em>
+            </>
+          )}
+        </span>
       </div>
 
       <div className="kyc-bolinhas">

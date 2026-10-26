@@ -171,21 +171,53 @@ export default function VerificacaoKyc({
 
         <div className="kyc-trilha">
           {[
-            { n: 1 as Etapa, label: "Dados", pronto: temDados },
-            { n: 2 as Etapa, label: "Endereço e documentos", pronto: temDocumentos && temEndereco },
-            { n: 3 as Etapa, label: "Biometria", pronto: temFace },
-            { n: 4 as Etapa, label: "Enviar", pronto: prontoParaEnviar },
-          ].map((e) => (
-            <button
-              key={e.n}
-              className={`kyc-etapa${etapa === e.n ? " atual" : ""}${e.pronto ? " pronta" : ""}`}
-              onClick={() => setEtapa(e.n)}
-              type="button"
-            >
-              <span className="num">{e.pronto && etapa !== e.n ? "✓" : e.n}</span>
-              {e.label}
-            </button>
-          ))}
+            { n: 1 as Etapa, label: "Dados", pronto: temDados, bloqueio: null },
+            {
+              n: 2 as Etapa,
+              label: "Endereço e documentos",
+              pronto: temDocumentos && temEndereco,
+              bloqueio: !temDados ? "Preencha seus dados primeiro." : null,
+            },
+            {
+              n: 3 as Etapa,
+              label: "Biometria",
+              pronto: temFace,
+              bloqueio: !(temDados && temEndereco && temDocumentos)
+                ? "Conclua o endereço e envie os documentos primeiro."
+                : null,
+            },
+            {
+              n: 4 as Etapa,
+              label: "Enviar",
+              pronto: prontoParaEnviar,
+              bloqueio: !temFace ? "Faça a prova de vida primeiro." : null,
+            },
+          ].map((e) => {
+            // Não dá para pular etapa: cada uma depende da anterior. Antes o
+            // trilho era clicável à vontade e dava para chegar ao envio sem
+            // documento nenhum.
+            const travada = Boolean(e.bloqueio);
+            return (
+              <button
+                key={e.n}
+                className={`kyc-etapa${etapa === e.n ? " atual" : ""}${e.pronto ? " pronta" : ""}${travada ? " travada" : ""}`}
+                onClick={() => {
+                  if (travada) {
+                    setErro(e.bloqueio);
+                    return;
+                  }
+                  setErro(null);
+                  setEtapa(e.n);
+                }}
+                type="button"
+                aria-disabled={travada}
+                title={e.bloqueio ?? undefined}
+              >
+                <span className="num">{e.pronto && etapa !== e.n ? "✓" : e.n}</span>
+                {e.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -421,9 +453,28 @@ export default function VerificacaoKyc({
           </div>
 
           <div className="kyc-acoes">
-            <button type="button" className="bank-acao principal" onClick={() => setEtapa(3)}>
+            <button
+              type="button"
+              className="bank-acao principal"
+              disabled={!(temEndereco && temDocumentos)}
+              onClick={() => {
+                if (!(temEndereco && temDocumentos)) {
+                  setErro("Preencha o endereço e envie o documento (frente, verso, comprovante e selfie) para seguir.");
+                  return;
+                }
+                setErro(null);
+                setEtapa(3);
+              }}
+            >
               Ir para a biometria
             </button>
+            {!(temEndereco && temDocumentos) && (
+              <p className="fine">
+                Faltam: {!temEndereco ? "endereço" : ""}
+                {!temEndereco && !temDocumentos ? ", " : ""}
+                {!temDocumentos ? "documentos" : ""}.
+              </p>
+            )}
           </div>
         </>
       )}
@@ -456,9 +507,22 @@ export default function VerificacaoKyc({
           <CapturaFacial onFace={registrarFace} onConcluir={concluirBiometria} />
 
           <div className="kyc-acoes">
-            <button type="button" className="bank-acao principal" onClick={() => setEtapa(4)}>
+            <button
+              type="button"
+              className="bank-acao principal"
+              disabled={!temFace}
+              onClick={() => {
+                if (!temFace) {
+                  setErro("Faça a prova de vida: capture os cinco ângulos para continuar.");
+                  return;
+                }
+                setErro(null);
+                setEtapa(4);
+              }}
+            >
               Ir para o envio
             </button>
+            {!temFace && <p className="fine">Capture os cinco ângulos para liberar esta etapa.</p>}
           </div>
         </div>
       )}

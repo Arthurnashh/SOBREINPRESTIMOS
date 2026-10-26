@@ -568,26 +568,29 @@ begin
   if k.status = 'em_analise' then raise exception 'Sua verificação já está em análise'; end if;
   if k.status = 'aprovado'   then raise exception 'Sua verificação já foi aprovada'; end if;
 
+  -- Cada item precisa de cast para text. Sem isso o `||` é interpretado como
+  -- concatenação de ARRAY LITERAL e o Postgres estoura 22P02
+  -- ("malformed array literal") em vez de montar a lista do que falta.
   if k.full_name is null or k.birth_date is null or k.mother_name is null then
-    faltas := faltas || 'dados pessoais';
+    faltas := faltas || 'dados pessoais'::text;
   end if;
-  if k.phone is null or k.email is null then faltas := faltas || 'contato'; end if;
-  if k.cep is null or k.address is null or k.city is null then faltas := faltas || 'endereço'; end if;
+  if k.phone is null or k.email is null then faltas := faltas || 'contato'::text; end if;
+  if k.cep is null or k.address is null or k.city is null then faltas := faltas || 'endereço'::text; end if;
   if k.doc_type is null or k.doc_number is null or k.doc_issuer is null then
-    faltas := faltas || 'dados do documento';
+    faltas := faltas || 'dados do documento'::text;
   end if;
 
-  if k.doc_front_path is null then faltas := faltas || 'foto da frente do documento'; end if;
-  if k.doc_back_path  is null then faltas := faltas || 'foto do verso do documento'; end if;
-  if k.proof_path     is null then faltas := faltas || 'comprovante de endereço'; end if;
-  if k.selfie_doc_path is null then faltas := faltas || 'selfie segurando o documento'; end if;
+  if k.doc_front_path is null then faltas := faltas || 'foto da frente do documento'::text; end if;
+  if k.doc_back_path  is null then faltas := faltas || 'foto do verso do documento'::text; end if;
+  if k.proof_path     is null then faltas := faltas || 'comprovante de endereço'::text; end if;
+  if k.selfie_doc_path is null then faltas := faltas || 'selfie segurando o documento'::text; end if;
 
   if k.face_front_path is null or k.face_right_path is null or k.face_left_path is null
      or k.face_smile_path is null or k.face_near_path is null then
-    faltas := faltas || 'captura facial (5 ângulos)';
+    faltas := faltas || 'captura facial (5 ângulos)'::text;
   end if;
 
-  if not k.liveness_passed then faltas := faltas || 'prova de vida'; end if;
+  if not k.liveness_passed then faltas := faltas || 'prova de vida'::text; end if;
 
   if array_length(faltas, 1) > 0 then
     raise exception 'Falta concluir: %', array_to_string(faltas, ', ');
