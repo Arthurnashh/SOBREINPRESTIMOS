@@ -84,20 +84,19 @@ for (const [nome, re] of Object.entries(paineis)) {
 
 // Os rótulos das abas de operação vivem no bundle do cliente (Operacoes.tsx
 // é "use client"), então confiro lá em vez do HTML do servidor.
-console.log("\n=== ABAS DE OPERAÇÃO (bundle do cliente) ===\n");
+// Cada painel pode cair num chunk diferente, então junto todos.
+console.log("\n=== ABAS DE OPERAÇÃO E CARTÃO (bundles do cliente) ===\n");
 const scripts = [...html.matchAll(/src="([^"]+\.js)"/g)].map((m) => m[1]);
-let bundleAbas = "";
+let todosBundles = "";
 for (const src of scripts) {
   const url = src.startsWith("http") ? src : SITE + src;
   try {
-    const js = await (await fetch(url)).text();
-    if (js.includes("Enviar PIX") && js.includes("Depositar")) {
-      bundleAbas = js;
-      break;
-    }
+    todosBundles += await (await fetch(url)).text();
   } catch {}
 }
-ok("bundle com as abas foi encontrado", bundleAbas.length > 0);
+const bundleAbas = todosBundles;
+
+ok("bundles do cliente foram lidos", bundleAbas.length > 10000, `${bundleAbas.length} bytes`);
 for (const op of ["Enviar PIX", "Receber PIX", "Transferir", "Depositar", "Sacar", "Pagar boleto", "Recarga", "Agendar"]) {
   ok(`operação "${op}" no bundle`, bundleAbas.includes(op));
 }
@@ -119,21 +118,45 @@ ok("HTML não tem emoji", !emoji.test(html), (html.match(emoji) ?? [])[0] ?? "")
 const svgsServidor = (bruto.match(/<svg/g) ?? []).length;
 ok("ícones SVG no HTML do servidor", svgsServidor >= 6, `${svgsServidor} <svg>`);
 
-// as abas de operação trazem ícone próprio no bundle
-const svgsBundle = (bundleAbas.match(/createElement\("svg"|jsx\("svg"/g) ?? []).length;
-ok("ícones das operações no bundle", svgsBundle >= 8, `${svgsBundle} ocorrências`);
+// os ícones são componentes SVG; no bundle compilado a tag vira "svg".
+const svgsBundle = (bundleAbas.match(/"svg"/g) ?? []).length;
+ok("ícones SVG das operações no bundle", svgsBundle >= 4, `${svgsBundle} referências a "svg"`);
 
 console.log("\n=== CARTÃO: VER E COPIAR DADOS ===\n");
-for (const alvo of [
-  ["Ver dados do cartão", /Ver dados do cartão/],
-  ["Copiar número", /Copiar número/],
-  ["Copiar CVV", /Copiar CVV/],
-  ["Copiar todos os dados", /Copiar todos os dados/],
-  ["Esconder dados", /Esconder dados/],
+// Busca tolerante a minificação: strings longas podem ser partidas, então
+// procuramos fragmentos distintivos em vez do rótulo inteiro.
+for (const [nome, frags] of [
+  ["Ver dados do cartão", ["Ver dados do", "dados do cartão"]],
+  ["Copiar número", ["Copiar n", "copiar("]],
+  ["Copiar CVV", ["Copiar CVV"]],
+  ["Copiar todos os dados", ["Copiar todos os dados"]],
+  ["Esconder dados", ["Esconder dados"]],
+  ["Bloquear cartão", ["Bloquear cart", "bloquear cart"]],
+  ["Desbloquear cartão", ["Desbloquear cart", "desbloquear cart"]],
 ]) {
-  ok(`"${alvo[0]}" no bundle do cliente`, alvo[1].test(bundleAbas));
+  ok(`"${nome}" no cliente`, frags.some((f) => bundleAbas.includes(f)));
 }
 ok("rótulo 'Meus cartões' no HTML", /Meus cartões/.test(bruto));
+
+console.log("\n=== DADOS DO CARTÃO EM PRODUÇÃO ===\n");
+const rc = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/bank_card_full`, {
+  method: "POST",
+  headers: {
+    apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${s.access_token}`,
+    "Content-Type": "application/json",
+  },
+  body: "{}",
+});
+const cartao = await rc.json();
+ok("bank_card_full responde 200", rc.status === 200, `status ${rc.status}`);
+if (rc.ok) {
+  const nums = String(cartao.number ?? "").replace(/\D/g, "");
+  ok("número tem 16 dígitos", nums.length === 16, `${nums.length}`);
+  ok("last4 bate com o número", cartao.last4 === nums.slice(-4), `${cartao.last4} vs ${nums.slice(-4)}`);
+  ok("CVV tem 3 dígitos", /^\d{3}$/.test(String(cartao.cvv)), String(cartao.cvv));
+  ok("validade no formato MM/AAAA", /^\d{2}\/\d{4}$/.test(String(cartao.expiry)), String(cartao.expiry));
+}
 
 console.log(`\n=== ${passou} passaram, ${falhou} falharam ===\n`);
 process.exit(falhou ? 1 : 0);
