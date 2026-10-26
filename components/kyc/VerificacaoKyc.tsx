@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useActionState, useRef, useState, useTransition, type ReactNode } from "react";
 import {
   salvarDadosKyc,
   salvarEnderecoKyc,
@@ -70,6 +70,43 @@ export default function VerificacaoKyc({
     if (r.ok) await recarregar();
     return r;
   };
+
+  /*
+   * Os três formulários (dados, endereço, documento) usam useActionState.
+   * Antes eram `<form action={fn}>` cru, mas as actions têm a assinatura
+   * (_estado, formData) do useActionState: o Next passava o FormData como
+   * PRIMEIRO argumento, o segundo vinha undefined e o botão "Salvar" não
+   * salvava nem avançava. Agora cada envio salva E vai para a etapa seguinte.
+   */
+  const [estadoDados, acaoDados, dadosPendente] = useActionState(salvarDadosKyc, undefined);
+  const [estadoEndereco, acaoEndereco, enderecoPendente] = useActionState(salvarEnderecoKyc, undefined);
+  const [estadoDoc, acaoDoc, docPendente] = useActionState(salvarDocumentoKyc, undefined);
+
+  // Assim que cada envio dá certo, avança. Guardamos a etapa já processada
+  // para não voltar sozinho depois de o usuário navegar de propósito.
+  const avancouDados = useRef<number | null>(null);
+  useEffect(() => {
+    if (estadoDados?.ok && avancouDados.current !== 1) {
+      avancouDados.current = 1;
+      void recarregar().then(() => setEtapa(2));
+    }
+  }, [estadoDados]);
+
+  const avancouEndereco = useRef<number | null>(null);
+  useEffect(() => {
+    if (estadoEndereco?.ok && avancouEndereco.current !== 2) {
+      avancouEndereco.current = 2;
+      void recarregar();
+    }
+  }, [estadoEndereco]);
+
+  const avancouDoc = useRef<number | null>(null);
+  useEffect(() => {
+    if (estadoDoc?.ok && avancouDoc.current !== 3) {
+      avancouDoc.current = 3;
+      void recarregar();
+    }
+  }, [estadoDoc]);
 
   const registrarFace = async (angle: FaceAngle, blob: Blob) => {
     const arquivo = new File([blob], `${angle}.jpg`, { type: "image/jpeg" });
@@ -257,7 +294,7 @@ export default function VerificacaoKyc({
 
       {/* ----------------------------- ETAPA 1 ----------------------------- */}
       {etapa === 1 && (
-        <form action={salvarDadosKyc as unknown as (f: FormData) => void} className="kyc-bloco">
+        <form action={acaoDados} className="kyc-bloco">
           <header>
             <h2>1. Seus dados</h2>
             <p>Precisam bater exatamente com o seu documento.</p>
@@ -295,15 +332,16 @@ export default function VerificacaoKyc({
             <IconePerfil size={14} /> O CPF do cadastro é conferido na análise, junto com o documento.
           </p>
 
+          {estadoDados?.error && (
+            <div className="alert alert-err" role="alert">
+              {estadoDados.error}
+            </div>
+          )}
+
           <div className="kyc-acoes">
-            <button className="bank-acao principal" disabled={pendente}>
-              {pendente ? "Salvando…" : "Salvar e continuar"}
+            <button className="bank-acao principal" disabled={dadosPendente}>
+              {dadosPendente ? "Salvando…" : "Salvar e continuar"}
             </button>
-            {temDados && (
-              <button type="button" className="bank-acao" onClick={() => setEtapa(2)}>
-                Ir para documentos
-              </button>
-            )}
           </div>
         </form>
       )}
@@ -311,7 +349,7 @@ export default function VerificacaoKyc({
       {/* ----------------------------- ETAPA 2 ----------------------------- */}
       {etapa === 2 && (
         <>
-          <form action={salvarEnderecoKyc as unknown as (f: FormData) => void} className="kyc-bloco">
+          <form action={acaoEndereco} className="kyc-bloco">
             <header>
               <h2>2. Onde você mora</h2>
               <p>O endereço precisa aparecer no comprovante que você vai enviar.</p>
@@ -353,14 +391,20 @@ export default function VerificacaoKyc({
               </Campo>
             </div>
 
+            {estadoEndereco?.error && (
+              <div className="alert alert-err" role="alert">
+                {estadoEndereco.error}
+              </div>
+            )}
+
             <div className="kyc-acoes">
-              <button className="bank-acao principal" disabled={pendente}>
-                {pendente ? "Salvando…" : "Salvar endereço"}
+              <button className="bank-acao principal" disabled={enderecoPendente}>
+                {enderecoPendente ? "Salvando…" : "Salvar endereço"}
               </button>
             </div>
           </form>
 
-          <form action={salvarDocumentoKyc as unknown as (f: FormData) => void} className="kyc-bloco">
+          <form action={acaoDoc} className="kyc-bloco">
             <header>
               <h2>3. Seu documento</h2>
               <p>CNH ou RG — os dois valem, e vamos pedir frente e verso.</p>
@@ -394,9 +438,15 @@ export default function VerificacaoKyc({
               </Campo>
             </div>
 
+            {estadoDoc?.error && (
+              <div className="alert alert-err" role="alert">
+                {estadoDoc.error}
+              </div>
+            )}
+
             <div className="kyc-acoes">
-              <button className="bank-acao principal" disabled={pendente}>
-                {pendente ? "Salvando…" : "Salvar documento"}
+              <button className="bank-acao principal" disabled={docPendente}>
+                {docPendente ? "Salvando…" : "Salvar documento"}
               </button>
             </div>
           </form>
@@ -453,20 +503,23 @@ export default function VerificacaoKyc({
           </div>
 
           <div className="kyc-acoes">
+            {/* Fica sempre clicável: se faltar algo, explica em vez de virar
+                um botão morto sem motivo aparente. */}
             <button
               type="button"
               className="bank-acao principal"
-              disabled={!(temEndereco && temDocumentos)}
               onClick={() => {
                 if (!(temEndereco && temDocumentos)) {
-                  setErro("Preencha o endereço e envie o documento (frente, verso, comprovante e selfie) para seguir.");
+                  setErro(
+                    "Preencha o endereço e envie o documento (frente, verso, comprovante e selfie) para seguir."
+                  );
                   return;
                 }
                 setErro(null);
                 setEtapa(3);
               }}
             >
-              Ir para a biometria
+              Continuar para a biometria
             </button>
             {!(temEndereco && temDocumentos) && (
               <p className="fine">
@@ -510,7 +563,6 @@ export default function VerificacaoKyc({
             <button
               type="button"
               className="bank-acao principal"
-              disabled={!temFace}
               onClick={() => {
                 if (!temFace) {
                   setErro("Faça a prova de vida: capture os cinco ângulos para continuar.");
@@ -520,7 +572,7 @@ export default function VerificacaoKyc({
                 setEtapa(4);
               }}
             >
-              Ir para o envio
+              Continuar para o envio
             </button>
             {!temFace && <p className="fine">Capture os cinco ângulos para liberar esta etapa.</p>}
           </div>
