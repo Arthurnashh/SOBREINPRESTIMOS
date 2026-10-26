@@ -81,6 +81,18 @@ const t = texto(banco.html);
 for (const rotulo of ["Início", "Área PIX", "Cartões", "Extrato", "Perfil", "Config"]) {
   ok(`aba "${rotulo}" presente`, t.includes(rotulo));
 }
+
+// Menu lateral: PIX e Cartões já moram DENTRO da conta bancária, então o menu
+// não deve repetir esses atalhos apontando para a mesma rota.
+const menu = (banco.html.match(/<nav class="side"[\s\S]*?<\/nav>/) ?? [""])[0];
+ok("menu lateral tem 'Conta bancária'", /Conta bancária/.test(menu));
+ok("menu lateral NÃO repete 'Área PIX'", !/Área PIX/.test(menu));
+ok("menu lateral NÃO repete 'Cartões'", !/Cartões/.test(menu));
+ok(
+  "menu lateral sem links duplicados para /conta/banco",
+  (menu.match(/href="\/conta\/banco"/g) ?? []).length === 1,
+  `${(menu.match(/href="\/conta\/banco"/g) ?? []).length} ocorrências`
+);
 // Aqui só o que aparece no texto visível. Os painéis que vivem no payload
 // RSC e as abas do cliente são cobertos por e2e-banco-paineis.mjs.
 ok("saldo disponível visível", /Saldo disponível/i.test(t));

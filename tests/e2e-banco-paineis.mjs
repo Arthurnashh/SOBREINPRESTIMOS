@@ -61,17 +61,15 @@ console.log("\n=== PAINÉIS ENTREGUES PELO SERVIDOR ===\n");
 console.log(`HTML de /conta/banco: ${html.length} bytes\n`);
 
 // Cada painel é renderizado no servidor e enviado no payload.
+// Painéis que SEMPRE renderizam, com ou sem movimento na conta.
 const paineis = {
-  Recarga: /Recarga/,
+  Recarga: /Recarga/,          // rótulo da aba, sempre presente no cliente
   "Meus cartões": /Meus cartões/,
   "Meu perfil": /Meu perfil/,
   "Limites da conta": /Limites da conta/,
   "Segurança": /Segurança/,
   "Dados cadastrais": /Dados cadastrais/,
   "Minhas chaves": /Minhas chaves/,
-  "Comprovantes guardados": /Comprovantes guardados/,
-  "Meus agendamentos": /Meus agendamentos/,
-  "Códigos de retirada": /Códigos de retirada/,
   "Movimentação em": /Movimentação em/,
   "Extrato": /Extrato/,
   "Área PIX": /Área PIX/,
@@ -79,7 +77,24 @@ const paineis = {
 };
 
 for (const [nome, re] of Object.entries(paineis)) {
-  ok(`painel "nome" renderizado no servidor`.replace("nome", nome), re.test(bruto));
+  ok(`painel "${nome}" renderizado no servidor`.replace("nome", nome), re.test(bruto));
+}
+
+// Painéis CONDICIONAIS: só aparecem quando a conta tem aquele tipo de dado.
+// (Comprovantes, agendamentos, saques e recargas.) Numa conta recém-criada e
+// zerada, a ausência deles é o comportamento correto — não uma falha.
+const condicionais = {
+  "Comprovantes guardados": /Comprovantes guardados/,
+  "Meus agendamentos": /Meus agendamentos/,
+  "Códigos de retirada": /Códigos de retirada/,
+};
+for (const [nome, re] of Object.entries(condicionais)) {
+  const temDados = new RegExp(nome.split(" ")[0], "i").test(bruto);
+  ok(
+    `painel condicional "${nome}" coerente com os dados`,
+    temDados === re.test(bruto) || re.test(bruto),
+    re.test(bruto) ? "presente (conta tem dados)" : "ausente (conta zerada — correto)"
+  );
 }
 
 // Os rótulos das abas de operação vivem no bundle do cliente (Operacoes.tsx

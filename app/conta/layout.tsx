@@ -21,8 +21,6 @@ export default async function ContaLayout({ children }: { children: React.ReactN
         <nav className="side" aria-label="Conta">
           <Link href="/conta">Início</Link>
           <Link href="/conta/banco">Conta bancária</Link>
-          <Link href="/conta/banco">Área PIX</Link>
-          <Link href="/conta/banco">Cartões</Link>
           <Link href="/conta/emprestimo">Empréstimo</Link>
           {profile?.is_admin && <Link href="/admin">Administração</Link>}
           <form action={signOut}>
