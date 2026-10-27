@@ -493,3 +493,38 @@ $$;
 
 revoke all on function public.loan_contrato(uuid) from public, anon;
 grant execute on function public.loan_contrato(uuid) to authenticated;
+
+-- ------------------- 11. backfill opcional ---------------------------
+-- Pedidos liberados ANTES desta migração não ganham taxa automaticamente
+-- (é proposital: não se cobra retroativo de cliente). Para aplicar a taxa
+-- a um pedido já liberado — por exemplo, para testar na própria conta —
+-- descomente o bloco, troque o id e rode depois do script principal.
+--
+-- O bloqueio aqui é só o valor da TAXA, e não o valor do empréstimo: parte
+-- do dinheiro liberado pode já ter sido usada, e bloquear o total deixaria
+-- o disponível negativo.
+--
+-- do $$
+-- declare
+--   v_loan uuid := 'COLE-O-ID-DO-PEDIDO';
+--   l public.loan_requests;
+--   v_taxa numeric(14,2);
+-- begin
+--   select * into l from public.loan_requests where id = v_loan for update;
+--   if not found then raise exception 'pedido não encontrado'; end if;
+--   if l.taxa_adesao is not null then raise exception 'pedido já tem taxa'; end if;
+--   if l.status <> 'liberado' then raise exception 'pedido não está liberado'; end if;
+--   if l.installment_value is null then raise exception 'pedido sem valor de parcela'; end if;
+--
+--   v_taxa := round(l.installment_value * 0.5, 2);
+--
+--   update public.loan_requests
+--      set taxa_adesao        = v_taxa,
+--          taxa_adesao_pct    = 0.5,
+--          taxa_adesao_status = 'pendente'
+--    where id = v_loan;
+--
+--   update public.bank_accounts
+--      set bloqueado = bloqueado + v_taxa
+--    where user_id = l.user_id;
+-- end $$;
