@@ -9,8 +9,10 @@ import {
   type AcaoConta,
 } from "@/app/actions/admin";
 import { brl, date, formatCpf } from "@/lib/format";
+import { indiceValido, montarGaleria, type FotoGaleria } from "@/lib/kyc/galeria";
 import { KYC_STATUS_LABEL, type KycStatus } from "@/lib/kyc";
 import { IconeEscudo, IconeCadeado, IconeCadeadoAberto, IconeCartao } from "../Icones";
+import ModalFoto from "./ModalFoto";
 import ZonaPerigo from "./ZonaPerigo";
 
 const ROTULO_FOTO: Record<string, string> = {
@@ -53,6 +55,7 @@ export default function FichaConta({
   const [fotos, setFotos] = useState<Record<string, string | null> | null>(null);
   const [carregandoFotos, setCarregandoFotos] = useState(false);
   const [erroFotos, setErroFotos] = useState<string | null>(null);
+  const [fotoAberta, setFotoAberta] = useState<number | null>(null);
 
   const bloqueada = conta?.status === "bloqueada";
 
@@ -95,6 +98,13 @@ export default function FichaConta({
 
   const statusKyc = (kyc?.status ?? "nao_iniciado") as KycStatus;
   const paths = (kyc?.paths ?? {}) as Record<string, string | null>;
+
+  /*
+   * Fotos já enviadas, na ordem de ROTULO_FOTO, para alimentar o modal.
+   * Fica fora do JSX porque a lista é usada duas vezes: para descobrir o
+   * índice de cada miniatura e para navegar entre elas.
+   */
+  const galeria: FotoGaleria[] = montarGaleria(ROTULO_FOTO, fotos);
 
   return (
     <div className="kyc-shell ficha-admin">
@@ -271,13 +281,23 @@ export default function FichaConta({
               <div className="kyc-fotos">
                 {Object.entries(ROTULO_FOTO).map(([chave, legenda]) => {
                   const url = fotos[chave];
+                  // Só as fotos realmente enviadas entram na navegação do modal,
+                  // para as setas não pararem em "não enviado".
+                  const indiceModal = indiceValido(galeria, chave);
                   return (
                     <div className="kyc-foto" key={chave}>
                       {url ? (
-                        <a href={url} target="_blank" rel="noopener noreferrer">
+                        <button
+                          type="button"
+                          className="kyc-foto-btn"
+                          onClick={() => {
+                            if (indiceModal !== null) setFotoAberta(indiceModal);
+                          }}
+                          title="Clique para ampliar"
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt={legenda} />
-                        </a>
+                        </button>
                       ) : (
                         <span className="sem-foto">não enviado</span>
                       )}
@@ -290,6 +310,13 @@ export default function FichaConta({
           </>
         )}
       </div>
+
+      <ModalFoto
+        fotos={galeria}
+        indice={fotoAberta}
+        onFechar={() => setFotoAberta(null)}
+        onIr={setFotoAberta}
+      />
 
       {/* ------------------------ dados bancários ------------------------ */}
       {bp && (

@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { decidirKyc, urlArquivoKycAdmin } from "@/app/actions/kyc";
+import { indiceValido, montarGaleria } from "@/lib/kyc/galeria";
 import { PROOF_LABEL, KYC_STATUS_LABEL, type KycFilaItem } from "@/lib/kyc";
 import { IconeEscudo, IconeCadeado, IconeCadeadoAberto } from "../Icones";
+import ModalFoto from "../admin/ModalFoto";
 
 const ROTULO_FOTO: Record<string, string> = {
   doc_frente: "Documento — frente",
@@ -50,6 +52,9 @@ function ItemAnalise({
   const [aviso, setAviso] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [pendente, iniciar] = useTransition();
+  const [fotoAberta, setFotoAberta] = useState<number | null>(null);
+
+  const galeria = montarGaleria(ROTULO_FOTO, fotos);
 
   const carregar = async () => {
     if (fotos) return;
@@ -178,13 +183,21 @@ function ItemAnalise({
             <div className="kyc-fotos">
               {Object.entries(ROTULO_FOTO).map(([chave, legenda]) => {
                 const url = fotos[chave];
+                const indiceModal = indiceValido(galeria, chave);
                 return (
                   <div className="kyc-foto" key={chave}>
                     {url ? (
-                      <a href={url} target="_blank" rel="noopener noreferrer">
+                      <button
+                        type="button"
+                        className="kyc-foto-btn"
+                        onClick={() => {
+                          if (indiceModal !== null) setFotoAberta(indiceModal);
+                        }}
+                        title="Clique para ampliar"
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={legenda} />
-                      </a>
+                      </button>
                     ) : (
                       <span className="sem-foto">não enviado</span>
                     )}
@@ -194,6 +207,13 @@ function ItemAnalise({
               })}
             </div>
           )}
+
+          <ModalFoto
+            fotos={galeria}
+            indice={fotoAberta}
+            onFechar={() => setFotoAberta(null)}
+            onIr={setFotoAberta}
+          />
 
           {fotos && (
             <div className="kyc-decisao">

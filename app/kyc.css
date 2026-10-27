@@ -820,6 +820,143 @@
 
 .perigo-exclusao .bank-acao.perigo { justify-content: center; }
 
+/* --------------------- modal de foto (admin/kyc) ---------------------- */
+/* A foto abre sobre a tela em vez de numa aba nova: a URL assinada do
+   Supabase expira, e o admin precisa comparar documento com selfie sem
+   perder o contexto da analise. */
+
+.kyc-foto-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.kyc-foto-btn:focus-visible {
+  outline: 2px solid var(--brand, #0a2544);
+  outline-offset: 2px;
+}
+
+.modal-foto-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(6, 18, 32, 0.82);
+  backdrop-filter: blur(3px);
+  animation: modal-surgir 0.14s ease-out;
+}
+
+@keyframes modal-surgir {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal-foto {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 10px;
+  width: min(1080px, 100%);
+  max-height: 94vh;
+  padding: 14px;
+  border-radius: 16px;
+  background: #0b1c30;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+.modal-foto-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #eef4fb;
+}
+.modal-foto-topo strong { font-size: 15px; display: block; }
+.modal-foto-topo .fine { color: #9db2c8; }
+
+.modal-foto-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.modal-foto-acoes .bank-acao {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #eef4fb;
+}
+.modal-foto-acoes .bank-acao:hover { background: rgba(255, 255, 255, 0.18); }
+
+.modal-foto-palco {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  border-radius: 12px;
+  background: #06121f;
+  min-height: 200px;
+}
+
+.modal-foto-palco img {
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  cursor: zoom-in;
+  border-radius: 6px;
+}
+
+/* Ampliar: a imagem cresce alem do palco e o scroll assume. */
+.modal-foto-palco.ampliado { place-items: start center; }
+.modal-foto-palco img.ampliada {
+  max-width: none;
+  max-height: none;
+  width: auto;
+  cursor: zoom-out;
+}
+
+.modal-foto-seta {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal-foto-seta:hover { background: rgba(255, 255, 255, 0.26); }
+.modal-foto-seta.esq { left: 10px; }
+.modal-foto-seta.dir { right: 10px; }
+
+.modal-foto-miniaturas {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.modal-foto-mini {
+  flex: 0 0 auto;
+  width: 60px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #06121f;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.modal-foto-mini img { width: 100%; height: 100%; object-fit: cover; }
+.modal-foto-mini.ativa { border-color: #4da3ff; opacity: 1; }
+
 @media (max-width: 880px) {
   .kyc-topo,
   .kyc-bloco { padding: 18px 16px; }
@@ -828,4 +965,7 @@
   .kyc-etapa { padding: 7px 11px; font-size: 12px; }
   .kyc-fotos { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
   .suspensa-wrap { padding: 24px 14px 56px; }
+  .modal-foto { padding: 10px; max-height: 96vh; }
+  .modal-foto-palco img { max-height: 58vh; }
+  .modal-foto-seta { width: 36px; height: 36px; font-size: 22px; }
 }
