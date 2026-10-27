@@ -129,9 +129,21 @@ if (objetiva.ok) {
   ok("opção objetiva NÃO guarda descrição solta", lin?.seguro_descricao === null, JSON.stringify(lin?.seguro_descricao));
 }
 
-/* Um pedido em andamento por vez. */
-const repetido = await pedir(500, 6, "nenhum");
-ok("segundo pedido em andamento é recusado com mensagem clara", !repetido.ok && /em andamento/i.test(repetido.erro), repetido.erro.slice(0, 120));
+/* Um pedido em andamento por vez. Aqui NÃO usamos pedir(), porque ela limpa o
+   anterior — precisamos dos dois lado a lado para testar a regra. */
+const primeiro = await pedir(700, 6, "nenhum");
+ok("primeiro pedido é aceito", primeiro.ok, primeiro.erro.slice(0, 120));
+
+const segundo = await fetch(`${U}/rest/v1/rpc/loan_request`, {
+  method: "POST", headers: HC,
+  body: JSON.stringify({ p_amount: 800, p_installments: 6, p_seguro_tipo: "nenhum" }),
+});
+const corpoSegundo = await segundo.text();
+ok(
+  "segundo pedido em andamento é recusado com mensagem clara",
+  !segundo.ok && /já tem um pedido em andamento/i.test(corpoSegundo),
+  corpoSegundo.replace(/\s+/g, " ").slice(0, 140)
+);
 
 /* ---------- 3. aprovar pelo painel (o bug do "ação inválida") ---------- */
 console.log("\n-- aprovação pelo painel --");
@@ -191,8 +203,16 @@ const cookie = `sb-${REF}-auth-token=${encodeURIComponent(JSON.stringify({
   expires_at: adm.expires_at, refresh_token: adm.refresh_token, user: adm.user }))}`;
 const html = await (await fetch(`https://site-pearl-nine-93.vercel.app/admin/pedido/${alvo}`, { headers: { cookie } })).text();
 ok("a página do pedido mostra a seção de garantias", /Garantias declaradas/.test(html));
-ok("mostra a garantia marcada pelo cliente", /Veículo em seu nome/.test(html));
-ok("a página tem o botão de aprovar", /Aprovar com estas condições/.test(html));
+ok("mostra a garantia marcada pelo cliente", /Tenho ve\u00edculo em meu nome/.test(html));
+// O React insere comentários entre nós de texto, então comparamos sem tags.
+const texto = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+ok("a página tem o botão de aprovar", /Aprovar com estas condi/.test(texto));
+ok("a página tem o botão de recusar", /Recusar/.test(texto));
+ok("a taxa mostrada não tem lixo de ponto flutuante", !/3,98999/.test(texto), (texto.match(/value="([\d.,]+)"/) ?? [])[1]);
+
+/* A garantia também precisa aparecer no extrato de pedidos do painel. */
+const lista = await (await fetch(`https://site-pearl-nine-93.vercel.app/admin`, { headers: { cookie } })).text();
+ok("a lista de pedidos do admin abre", /Pedidos/.test(lista));
 
 /* ------------------------------ limpeza ------------------------------ */
 await fetch(`${U}/rest/v1/bank_transactions?user_id=eq.${uid}`, { method: "DELETE", headers: HS });

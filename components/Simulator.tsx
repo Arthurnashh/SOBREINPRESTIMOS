@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import { requestLoan, SEGURO_LABEL, SEGURO_TIPOS, type LoanFormState } from "@/app/actions/loans";
+import { requestLoan, type LoanFormState } from "@/app/actions/loans";
 import { LOAN } from "@/lib/config";
 import { brl, pct } from "@/lib/format";
 import { simulate } from "@/lib/loan";
+import { SEGURO_LABEL, SEGURO_TIPOS } from "@/lib/seguro";
 
 type Props = {
   mode: "landing" | "request";

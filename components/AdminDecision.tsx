@@ -25,7 +25,12 @@ type Aviso = { tipo: "ok" | "erro"; texto: string } | null;
  * navegador — que aqui não acontece. Toda aprovação caía em "Ação inválida.".
  */
 export default function AdminDecision({ id, amount, installments, defaultRate, status }: Props) {
-  const [rate, setRate] = useState((defaultRate * 100).toString().replace(".", ","));
+  /*
+   * Arredonda na exibição. `defaultRate * 100` produz coisas como
+   * 3,9899999999999998 por causa do ponto flutuante, e o admin via esse lixo
+   * no campo de taxa. Duas casas bastam para a taxa mensal.
+   */
+  const [rate, setRate] = useState((defaultRate * 100).toFixed(2).replace(".", ","));
   const [note, setNote] = useState("");
   const [aviso, setAviso] = useState<Aviso>(null);
   const [pendente, iniciar] = useTransition();

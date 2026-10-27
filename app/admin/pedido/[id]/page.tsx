@@ -4,18 +4,12 @@ import AdminDecision from "@/components/AdminDecision";
 import { requireAdmin, STATUS_LABEL, type LoanRequest, type Profile } from "@/lib/account";
 import { LOAN } from "@/lib/config";
 import { brl, date, formatCpf, pct } from "@/lib/format";
+import { SEGURO_LABEL, type SeguroTipo } from "@/lib/seguro";
 
-/** Rótulos das garantias. Espelha o check de loan_requests no banco. */
-const SEGURO_TEXTO: Record<string, string> = {
-  veiculo: "Veículo em seu nome",
-  imovel: "Imóvel próprio",
-  vida: "Seguro de vida",
-  residencial: "Seguro residencial",
-  consignado: "Margem consignável ou convênio",
-  fiador: "Fiador",
-  nenhum: "Nenhuma garantia",
-  outro: "Outra situação",
-};
+function textoGarantia(tipo: string | null): string {
+  if (!tipo) return "—";
+  return SEGURO_LABEL[tipo as SeguroTipo] ?? tipo;
+}
 
 export default async function PedidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -83,7 +77,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           <dl className="rows">
             <div>
               <dt>Situação</dt>
-              <dd>{SEGURO_TEXTO[loan.seguro_tipo] ?? loan.seguro_tipo}</dd>
+              <dd>{textoGarantia(loan.seguro_tipo)}</dd>
             </div>
             {loan.seguro_descricao && (
               <div>

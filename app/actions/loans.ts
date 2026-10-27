@@ -5,31 +5,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LOAN } from "@/lib/config";
 import { isValidRequest } from "@/lib/loan";
+import { ehSeguroTipo } from "@/lib/seguro";
 
 export type LoanFormState = { error?: string } | undefined;
-
-/** Situações de garantia aceitas. Espelha o check de loan_requests.no banco. */
-export const SEGURO_TIPOS = [
-  "veiculo",
-  "imovel",
-  "vida",
-  "residencial",
-  "consignado",
-  "fiador",
-  "nenhum",
-  "outro",
-] as const;
-
-export const SEGURO_LABEL: Record<(typeof SEGURO_TIPOS)[number], string> = {
-  veiculo: "Tenho veículo em meu nome",
-  imovel: "Tenho imóvel próprio",
-  vida: "Tenho seguro de vida",
-  residencial: "Tenho seguro residencial",
-  consignado: "Tenho margem consignável ou convênio",
-  fiador: "Tenho fiador",
-  nenhum: "Não tenho nenhuma dessas garantias",
-  outro: "Outra situação",
-};
 
 export async function requestLoan(_prev: LoanFormState, formData: FormData): Promise<LoanFormState> {
   const amount = Number(formData.get("amount"));
@@ -51,10 +29,9 @@ export async function requestLoan(_prev: LoanFormState, formData: FormData): Pro
   if (!seguroTipo) {
     return { error: "Informe se você possui algum tipo de seguro ou garantia." };
   }
-  if (!(SEGURO_TIPOS as readonly string[]).includes(seguroTipo)) {
+  if (!ehSeguroTipo(seguroTipo)) {
     return { error: "Opção de seguro inválida." };
-  }
-  if (seguroTipo === "outro" && seguroDescricao.length < 3) {
+  }  if (seguroTipo === "outro" && seguroDescricao.length < 3) {
     return { error: "Descreva a sua situação no campo indicado." };
   }
 
