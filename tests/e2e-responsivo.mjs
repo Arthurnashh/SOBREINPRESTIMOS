@@ -95,11 +95,16 @@ for (const a of APARELHOS) {
     // 1. A página abre (200 ou redirect de sessão).
     const abriu = r.status === 200 || r.status === 307 || r.status === 302;
 
-    // 2. Procuramos larguras fixas em estilo inline que estouram a tela —
-    //    sinal claro de layout não responsivo.
-    const larguras = [...html.matchAll(/style="[^"]*?(?:min-)?width:\s*(\d{3,})px/g)]
-      .map((m) => Number(m[1]))
-      .filter((n) => n > a.w);
+    /*
+     * Procuramos largura FIXA (`width:`) que estoure a tela. `max-width` é
+     * seguro por definição — ele limita, não impõe — então é ignorado.
+     * O atributo `width` de imagem também entra, pois imagem larga empurra
+     * o layout.
+     */
+    const larguras = [
+      ...[...html.matchAll(/style="[^"]*?(?<!max-)\bwidth:\s*(\d{3,})px/g)].map((m) => Number(m[1])),
+      ...[...html.matchAll(/<img[^>]+\bwidth="(\d{3,})"/g)].map((m) => Number(m[1])),
+    ].filter((n) => n > a.w);
 
     ok(`${a.nome} · ${pg.nome}`, abriu && larguras.length === 0,
       !abriu ? `status ${r.status}` : `largura fixa de ${larguras.join(", ")}px numa tela de ${a.w}px`);

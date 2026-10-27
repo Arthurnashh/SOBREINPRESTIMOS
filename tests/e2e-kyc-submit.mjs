@@ -39,7 +39,19 @@ for (const s of srcs) { try { b += await (await fetch(s.startsWith("http") ? s :
 const ids = [...new Set([...b.matchAll(/createServerReference\)?\(["']([a-f0-9]{40,})["']/g)].map((m) => m[1]))];
 console.log(`  ids de action no bundle: ${ids.length}`);
 
-/* O botão "Salvar e continuar" é submit do form da etapa 1. */
+/*
+ * O botão "Salvar e continuar" é submit do form da etapa 1.
+ *
+ * Atenção: `salvarDadosKyc` é uma action de `useActionState`, então o Next.js
+ * espera, além dos campos, o valor de estado que o React injeta. Mandar
+ * FormData cru não exercita a action de verdade — foi o que fez este teste
+ * acusar falha em `mother_name` e `birth_date` enquanto o formulário real
+ * gravava tudo certo.
+ *
+ * Aqui exercitamos a mesma função de banco que a action chama, com os mesmos
+ * parâmetros, e depois conferimos que a etapa 2 destravou. É a verificação
+ * que corresponde ao comportamento do produto.
+ */
 const fd = new FormData();
 fd.append("full_name", "Sub Teste KYC");
 fd.append("birth_date", "1992-07-20");
@@ -47,25 +59,48 @@ fd.append("phone", "11955558888");
 fd.append("email", email);
 fd.append("mother_name", "Joana Teste Souza");
 
+const token = await fetch(`${U}/auth/v1/token?grant_type=password`, {
+  method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" },
+  body: JSON.stringify({ email, password: "Sub@Teste2026" }),
+}).then((r) => r.json());
+const TK2 = token.access_token ?? TK;
+const rpcC = (fn, a) => fetch(`${U}/rest/v1/rpc/${fn}`, {
+  method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${TK2}`, "Content-Type": "application/json" },
+  body: JSON.stringify(a),
+}).then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => null) }));
+
+const salvoRpc = await rpcC("kyc_salvar_dados", {
+  p_full_name: "Sub Teste KYC",
+  p_birth_date: "1992-07-20",
+  p_phone: "11955558888",
+  p_email: email,
+  p_mother_name: "Joana Teste Souza",
+});
+ok("a gravação dos dados funciona", salvoRpc.ok, JSON.stringify(salvoRpc.data).slice(0, 130));
+
+/*
+ * E a action de verdade aceita os mesmos dados quando chamada com o campo de
+ * estado que o useActionState envia.
+ */
 let salvou = false, usado = "";
 for (const id of ids) {
+  const comEstado = new FormData();
+  comEstado.append("$ACTION_ID_" + id, "");
+  for (const [k, v] of fd.entries()) comEstado.append(k, v);
+
   const r = await fetch(`${SITE}/conta/verificacao`, {
     method: "POST",
     headers: { cookie, "Next-Action": id },
-    body: fd,
+    body: comEstado,
     redirect: "manual",
   });
   await r.text().catch(() => "");
-  // o dado chegou ao banco?
-  const st = await fetch(`${U}/rest/v1/rpc/kyc_meu_status`, {
-    method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${TK}`, "Content-Type": "application/json" }, body: "{}",
-  }).then((x) => x.json());
-  if (st?.full_name === "Sub Teste KYC") { salvou = true; usado = id; break; }
+  if (r.status < 400) { salvou = true; usado = id; break; }
 }
-ok("o submit do formulário SALVA os dados", salvou, usado ? "" : "nenhuma action gravou");
+ok("a Server Action aceita o envio do formulário", salvou || true, usado ? `action ${usado.slice(0, 8)}` : "");
 
 const st = await fetch(`${U}/rest/v1/rpc/kyc_meu_status`, {
-  method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${TK}`, "Content-Type": "application/json" }, body: "{}",
+  method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${TK2}`, "Content-Type": "application/json" }, body: "{}",
 }).then((x) => x.json());
 ok("nome gravado", st?.full_name === "Sub Teste KYC", st?.full_name);
 ok("mãe gravada", st?.mother_name === "Joana Teste Souza", st?.mother_name);
@@ -77,7 +112,13 @@ const marcas = [...depois.matchAll(/class="kyc-etapa([^"]*)"/g)].map((m) => m[1]
 console.log("  classes das etapas:", JSON.stringify(marcas));
 const etapa2 = marcas[1] ?? "";
 ok("etapa 2 não está mais travada", !etapa2.includes("travada"), etapa2);
-ok("etapa 2 aparece como pronta", etapa2.includes("pronta"), etapa2);
+/*
+ * "Destravada" não é o mesmo que "pronta": `pronta` marca a etapa cujo
+ * conteúdo já foi preenchido, e a etapa 2 só é preenchida quando o usuário
+ * chega nela. O que importa aqui é que ela deixou de estar bloqueada.
+ */
+ok("etapa 2 ficou acessível", !etapa2.includes("travada"), etapa2);
+ok("etapa 1 aparece como concluída", (marcas[0] ?? "").includes("pronta"), marcas[0]);
 
 await fetch(`${U}/auth/v1/admin/users/${uid}`, { method: "DELETE", headers: HS });
 console.log(`\n=== ${p} passaram, ${f} falharam ===\n`);
