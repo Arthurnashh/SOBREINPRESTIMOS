@@ -4,14 +4,15 @@ import { useMemo, useState, useTransition } from "react";
 import { decideLoan } from "@/app/actions/admin";
 import { LOAN } from "@/lib/config";
 import { brl, pct } from "@/lib/format";
-import { simulate, taxaAdesao } from "@/lib/loan";
-
+import { simulate } from "@/lib/loan";
 type Props = {
   id: string;
   amount: number;
   installments: number;
   defaultRate: number;
   status: string;
+  /** Fração da parcela cobrada como taxa de confiança (0,5 = 50%). */
+  taxaPct: number;
 };
 
 type Aviso = { tipo: "ok" | "erro"; texto: string } | null;
@@ -24,7 +25,7 @@ type Aviso = { tipo: "ok" | "erro"; texto: string } | null;
  * capturado na renderização, e o `value` do botão só entra no envio nativo do
  * navegador — que aqui não acontece. Toda aprovação caía em "Ação inválida.".
  */
-export default function AdminDecision({ id, amount, installments, defaultRate, status }: Props) {
+export default function AdminDecision({ id, amount, installments, defaultRate, status, taxaPct }: Props) {
   /*
    * Arredonda na exibição. `defaultRate * 100` produz coisas como
    * 3,9899999999999998 por causa do ponto flutuante, e o admin via esse lixo
@@ -85,7 +86,7 @@ export default function AdminDecision({ id, amount, installments, defaultRate, s
                 <div>
                   <dt>Taxa de confiança</dt>
                   <dd>
-                    {brl(taxaAdesao(sim.installmentValue))} ({pct(LOAN.taxaAdesaoPct, 0)} da
+                    {brl(sim.installmentValue * taxaPct)} ({pct(taxaPct, 0)} da
                     parcela, abatida na 1ª)
                   </dd>
                 </div>

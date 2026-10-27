@@ -127,6 +127,17 @@ input[type="range"] { width: 100%; accent-color: var(--brand); height: 28px; }
   letter-spacing: -0.03em; color: var(--brand); margin: 16px 0 2px;
 }
 .modal-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.pix-qr {
+  display: block; width: 220px; max-width: 100%; height: auto;
+  margin: 16px auto 0; border: 1px solid var(--line); border-radius: 14px;
+  background: #fff; padding: 8px;
+}
+.pix-copia {
+  width: 100%; margin-top: 6px; padding: 10px 12px; resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  line-height: 1.4; color: var(--ink-2); background: var(--surface-2, #f4f6f5);
+  border: 1px solid var(--line); border-radius: 10px; word-break: break-all;
+}
 @media (max-width: 420px) {
   .modal-caixa { padding: 22px 18px; }
   .modal-acoes .btn { width: 100%; }
@@ -150,6 +161,9 @@ input[type="range"] { width: 100%; accent-color: var(--brand); height: 28px; }
 .auth h1 { font-size: 32px; margin-bottom: 6px; }
 .field { display: grid; gap: 6px; }
 .field label { font-size: 14px; font-weight: 700; }
+.field > span { font-size: 14px; font-weight: 700; }
+.check { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--ink-2); }
+.check input { width: 18px; height: 18px; accent-color: var(--brand); }
 .field input, .field select, .field textarea {
   height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line);
   font: 500 16px var(--body); background: #fff; color: var(--ink); width: 100%;

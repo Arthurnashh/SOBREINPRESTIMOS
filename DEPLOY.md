@@ -109,9 +109,22 @@ tocar, mesmo com todo o CSS responsivo correto. Está declarada lá, com
 12. `supabase/loan7.sql` — **taxa de confiança**: taxa de 50% da parcela
     retida no saldo na liberação, confirmação pelo cliente, abatimento na 1ª
     parcela e `bloqueado` na conta (o disponível passa a descontar o bloqueio)
+13. `supabase/loan8.sql` — **taxa paga por PIX (PagueCom)**: tabelas
+    `loan_fee_charges` e `app_settings`, cobrança reutilizada por 30 minutos,
+    `loan_taxa_pagar()` chamada pelo webhook/consulta, gate que bloqueia toda
+    saída da conta enquanto a taxa estiver pendente e `bank_credit_loan`
+    lendo o percentual do painel
 
-Os doze são idempotentes (`if not exists` / `drop policy if exists` /
+Os treze são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
+
+> **Depois do `loan8.sql`:** configure a chave do PagueCom em **Admin →
+> Gateway / Taxa** e ative a cobrança. Sem isso o cliente com taxa pendente vê
+> o aviso de pagamento indisponível e a conta continua bloqueada (é o
+> comportamento correto: nada é liberado antes do pagamento). A URL do webhook
+> aparece na mesma tela; cadastre-a no painel do PagueCom assinando
+> `charge.paid` e `charge.expired`. Mesmo sem webhook, a tela consulta o
+> gateway a cada 5 segundos.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
 > conta e cartão no cadastro. `bank2.sql` amplia a lista de tipos de
@@ -133,6 +146,10 @@ Os doze são idempotentes (`if not exists` / `drop policy if exists` /
 > `loan7.sql` também redefine `bank_move` — ele parte da versão do `kyc.sql`
 > (com o gate de identidade) e só acrescenta o desconto do saldo bloqueado.
 > Por isso precisa rodar **depois** de `kyc.sql`; rodar antes apaga o gate.
+>
+> `loan8.sql` redefine `bank_move` e `bank_move_for` **de novo** — parte da
+> versão do `loan7.sql` e acrescenta o gate da taxa pendente. Rode por último,
+> depois de `loan7.sql`, `kyc.sql` e `admin3.sql`, senão o gate se perde.
 >
 > `loan4.sql` é obrigatório para o empréstimo funcionar: `authenticated` **não
 > tem INSERT** em nenhuma tabela deste sistema — toda escrita passa por função

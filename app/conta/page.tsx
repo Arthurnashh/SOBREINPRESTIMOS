@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { cancelLoan } from "@/app/actions/loans";
-import TaxaAdesao from "@/components/TaxaAdesao";
 import { requireSession, STATUS_LABEL, type LoanRequest } from "@/lib/account";
 import { getBanking, KIND_LABEL } from "@/lib/banking";
 import { LOAN } from "@/lib/config";
@@ -39,27 +38,8 @@ export default async function ContaPage({
   const firstName = profile?.full_name.split(" ")[0] ?? "";
   const hasOpen = loans?.some((l) => l.status === "em_analise" || l.status === "aprovado");
 
-  // Pedido liberado cuja taxa de confiança ainda não foi confirmada.
-  const taxaPendente =
-    loans?.find(
-      (l) =>
-        l.status === "liberado" &&
-        l.taxa_adesao_status === "pendente" &&
-        l.taxa_adesao != null
-    ) ?? null;
-
   return (
     <div className="stack" style={{ ["--gap" as string]: "20px" }}>
-      {taxaPendente && (
-        <TaxaAdesao
-          loanId={taxaPendente.id}
-          parcela={Number(taxaPendente.installment_value ?? 0)}
-          taxa={Number(taxaPendente.taxa_adesao ?? 0)}
-          percentual={Number(taxaPendente.taxa_adesao_pct ?? LOAN.taxaAdesaoPct)}
-          ciente={Boolean(taxaPendente.taxa_adesao_ciente_em)}
-        />
-      )}
-
       <div>
         <h1 className="page-title">Olá, {firstName}</h1>
         <p className="muted">Aqui está o resumo da sua conta.</p>

@@ -29,6 +29,11 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
     .eq("id", loan.user_id)
     .maybeSingle<Profile>();
 
+  const { data: gateway } = await supabase.rpc("admin_gateway_config_get");
+  const taxaPct = Number(
+    (gateway as { taxa_pct?: number } | null)?.taxa_pct ?? LOAN.taxaAdesaoPct
+  );
+
   return (
     <div className="stack" style={{ ["--gap" as string]: "20px", maxWidth: 760 }}>
       <Link href="/admin" className="muted" style={{ textDecoration: "none" }}>
@@ -99,6 +104,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
         installments={loan.installments}
         defaultRate={loan.monthly_rate != null ? Number(loan.monthly_rate) : LOAN.monthlyRate}
         status={loan.status}
+        taxaPct={taxaPct}
       />
     </div>
   );

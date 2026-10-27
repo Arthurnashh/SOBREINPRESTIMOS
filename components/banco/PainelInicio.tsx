@@ -109,8 +109,9 @@ export default function PainelInicio({
           <h2>Precisa de crédito?</h2>
         </header>
         <p className="fine">
-          Você tem até {brl(20000)} disponíveis para simular. Sujeito a análise: a liberação retém a
-          taxa de confiança no saldo e o valor é abatido na primeira parcela.
+          Você tem até {brl(20000)} disponíveis para simular. Sujeito a análise: na liberação, a
+          conta fica bloqueada até o pagamento da taxa de confiança por PIX, que depois é abatida
+          na primeira parcela.
         </p>
         <Link href="/conta/emprestimo" className="btn btn-primary" style={{ justifySelf: "start" }}>
           Simular empréstimo

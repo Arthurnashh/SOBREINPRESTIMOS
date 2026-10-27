@@ -31,6 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/contas" className="btn btn-ghost">Contas</Link>
           <Link href="/admin/kyc" className="btn btn-ghost">Verificações</Link>
           <Link href="/admin/usuarios" className="btn btn-ghost">Usuários cadastrados</Link>
+          <Link href="/admin/config" className="btn btn-ghost">Gateway / Taxa</Link>
         </nav>
         {children}
       </div>
