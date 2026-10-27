@@ -5,7 +5,7 @@ import { useActionState, useMemo, useState } from "react";
 import { requestLoan, type LoanFormState } from "@/app/actions/loans";
 import { LOAN } from "@/lib/config";
 import { brl, pct } from "@/lib/format";
-import { simulate } from "@/lib/loan";
+import { PERIODICIDADES, PERIODO, simulate, type Periodicidade } from "@/lib/loan";
 import { SEGURO_LABEL, SEGURO_TIPOS } from "@/lib/seguro";
 
 type Props = {
@@ -16,10 +16,28 @@ type Props = {
 
 export default function Simulator({ mode, initialAmount = 5000, initialInstallments = 12 }: Props) {
   const [amount, setAmount] = useState(initialAmount);
+  const [periodicidade, setPeriodicidade] = useState<Periodicidade>("mensal");
   const [installments, setInstallments] = useState(initialInstallments);
   const [seguro, setSeguro] = useState("");
   const [state, action, pending] = useActionState<LoanFormState, FormData>(requestLoan, undefined);
-  const sim = useMemo(() => simulate(amount, installments), [amount, installments]);
+
+  const per = PERIODO[periodicidade];
+  const opcoes = per.opcoes;
+
+  // Ao trocar a periodicidade, o prazo escolhido pode não existir na nova
+  // modalidade (18 não existe em semanal, por exemplo). Ajusta para o mais
+  // próximo disponível em vez de deixar o formulário num estado inválido.
+  const trocarPeriodicidade = (p: Periodicidade) => {
+    setPeriodicidade(p);
+    if (!(PERIODO[p].opcoes as readonly number[]).includes(installments)) {
+      setInstallments(PERIODO[p].opcoes[PERIODO[p].opcoes.length - 1]);
+    }
+  };
+
+  const sim = useMemo(
+    () => simulate(amount, installments, LOAN.monthlyRate, periodicidade),
+    [amount, installments, periodicidade]
+  );
 
   const body = (
     <>
@@ -44,10 +62,29 @@ export default function Simulator({ mode, initialAmount = 5000, initialInstallme
       </div>
 
       <div className="sim-label" style={{ marginTop: 24 }}>
+        <span>Como prefere pagar?</span>
+      </div>
+      <div className="seg" role="radiogroup" aria-label="Periodicidade">
+        {PERIODICIDADES.map((p) => (
+          <label key={p}>
+            <input
+              type="radio"
+              name="periodicidade"
+              value={p}
+              checked={periodicidade === p}
+              onChange={() => trocarPeriodicidade(p)}
+            />
+            <span>{PERIODO[p].label}</span>
+          </label>
+        ))}
+      </div>
+
+      <div className="sim-label" style={{ marginTop: 24 }}>
         <span>Em quantas parcelas?</span>
+        <span className="muted">({per.unidade})</span>
       </div>
       <div className="seg" role="radiogroup" aria-label="Número de parcelas">
-        {LOAN.installmentOptions.map((n) => (
+        {opcoes.map((n) => (
           <label key={n}>
             <input
               type="radio"
@@ -63,7 +100,9 @@ export default function Simulator({ mode, initialAmount = 5000, initialInstallme
 
       <div className="sim-result">
         <div className="sim-label">
-          <span>{installments} parcelas fixas de</span>
+          <span>
+            {installments} {installments === 1 ? "parcela" : "parcelas"} de
+          </span>
         </div>
         <div className="big">{brl(sim.installmentValue)}</div>
         <dl className="rows">
@@ -77,7 +116,10 @@ export default function Simulator({ mode, initialAmount = 5000, initialInstallme
           </div>
           <div>
             <dt>Juros</dt>
-            <dd>{pct(sim.monthlyRate)} a.m.</dd>
+            <dd>
+              {pct(sim.taxaPeriodo)} por {per.label.toLowerCase().replace("al", "")}
+              <span className="fine"> ({pct(sim.monthlyRate)} a.m.)</span>
+            </dd>
           </div>
           <div>
             <dt>IOF (incluso nas parcelas)</dt>

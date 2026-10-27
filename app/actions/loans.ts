@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LOAN } from "@/lib/config";
-import { isValidRequest } from "@/lib/loan";
+import { ehPeriodicidade, isValidRequest, PERIODO } from "@/lib/loan";
 import { ehSeguroTipo } from "@/lib/seguro";
 
 export type LoanFormState = { error?: string } | undefined;
@@ -12,10 +12,15 @@ export type LoanFormState = { error?: string } | undefined;
 export async function requestLoan(_prev: LoanFormState, formData: FormData): Promise<LoanFormState> {
   const amount = Number(formData.get("amount"));
   const installments = Number(formData.get("installments"));
+  const periodicidadeBruta = String(formData.get("periodicidade") ?? "mensal");
+  const periodicidade = ehPeriodicidade(periodicidadeBruta) ? periodicidadeBruta : "mensal";
 
   const faixa = `R$ ${LOAN.min.toLocaleString("pt-BR")} e R$ ${LOAN.max.toLocaleString("pt-BR")}`;
-  if (!isValidRequest(amount, installments)) {
-    return { error: `Escolha um valor entre ${faixa} e um prazo válido.` };
+  if (!isValidRequest(amount, installments, periodicidade)) {
+    const opcoes = PERIODO[periodicidade].opcoes.join(", ");
+    return {
+      error: `Escolha um valor entre ${faixa} e um prazo válido (${opcoes} ${PERIODO[periodicidade].unidade}).`,
+    };
   }
   if (formData.get("confirm") !== "on") {
     return { error: "Confirme que leu as condições da simulação." };
@@ -55,6 +60,7 @@ export async function requestLoan(_prev: LoanFormState, formData: FormData): Pro
     p_installments: installments,
     p_seguro_tipo: seguroTipo,
     p_seguro_descricao: seguroTipo === "outro" ? seguroDescricao : null,
+    p_periodicidade: periodicidade,
   });
 
   if (error) {

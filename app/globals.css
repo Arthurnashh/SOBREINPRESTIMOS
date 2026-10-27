@@ -163,6 +163,74 @@ input[type="range"] { width: 100%; accent-color: var(--brand); height: 28px; }
   color: var(--ink);
   font-weight: 600;
 }
+
+/* ---------- empréstimos: parcelas e cobrança ---------- */
+.parcelas-tabela th[scope="row"] { white-space: nowrap; }
+.linha-atrasada { background: #fff6f5; }
+
+/* Barra de progresso do contrato. */
+.barra {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.barra > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  border-radius: 999px;
+  transition: width .3s ease;
+}
+
+.cobranca {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  background: #fff;
+  display: grid;
+  gap: 12px;
+}
+
+/* O aviso de que a cobrança não está ativa não é decoração: sem ele alguém
+   pode tentar pagar um boleto que não existe. Fica bem visível. */
+.aviso-gateway {
+  border-left: 4px solid #c9862b;
+  background: #fdf6e8;
+  color: #6b4a12;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.campo-copia {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.campo-copia code {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-2, #f7f9f8);
+  font-size: 13.5px;
+  letter-spacing: .3px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.campo-copia code.quebra {
+  white-space: normal;
+  word-break: break-all;
+  letter-spacing: 0;
+}
+
+@media (max-width: 560px) {
+  .campo-copia { flex-direction: column; }
+  .campo-copia .btn { width: 100%; }
+}
 .muted { color: var(--muted); }
 .center { text-align: center; }
 
