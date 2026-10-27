@@ -319,3 +319,119 @@ input[type="range"] { width: 100%; accent-color: var(--brand); height: 28px; }
   .sim-amount { font-size: 40px; }
   .header .btn-ghost { display: none; }
 }
+
+/* =====================================================================
+   RESPONSIVIDADE — celulares
+   Cobre de 320px (iPhone SE 1ª geração, Galaxy Fold fechado) até 560px.
+   Regras em ordem: primeiro o que serve a qualquer tela estreita, depois
+   ajustes pontuais para as menores.
+   ===================================================================== */
+
+/* Área segura: em aparelhos com notch/ilha, o conteúdo não pode ficar sob a
+   barra de gestos nem o recorte da câmera. */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.header .wrap,
+.footer .wrap {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+/* Impede que qualquer conteúdo largo (código de barras, URL, CPF) force a
+   página inteira a rolar de lado. */
+html, body { overflow-x: hidden; }
+img, svg, video, canvas { max-width: 100%; height: auto; }
+code, .quebra { overflow-wrap: anywhere; }
+
+/* Alvos de toque: 44px é o mínimo recomendado para o dedo acertar. */
+@media (max-width: 560px) {
+  .btn {
+    min-height: 44px;
+    height: auto;
+    padding: 11px 16px;
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .btn-ghost { min-height: 40px; }
+
+  /* Campos com 16px evitam o zoom automático do iOS ao focar. */
+  input, select, textarea, .input { font-size: 16px; }
+
+  /* Tabelas viram cartões empilhados: em 5 colunas não cabe nada legível
+     em 360px, e rolar de lado esconde justamente o botão de ação. */
+  .table-scroll { overflow-x: visible; }
+  .users-table { display: block; }
+  .users-table thead { display: none; }
+  .users-table tbody, .users-table tr, .users-table th, .users-table td { display: block; width: 100%; }
+  .users-table tr {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: var(--card, #fff);
+  }
+  .users-table th, .users-table td {
+    padding: 4px 0;
+    border: 0;
+    white-space: normal;
+    text-align: left;
+  }
+  .users-table td:empty { display: none; }
+  /* O rótulo de cada célula vem do data-label, já que o cabeçalho sumiu. */
+  .users-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--ink-2);
+    font-size: 13px;
+  }
+  .users-table td .btn { width: 100%; margin-top: 6px; }
+
+  /* Cabeçalho e rodapé */
+  .header .wrap { flex-wrap: wrap; row-gap: 8px; }
+  .nav { flex-wrap: wrap; gap: 10px 14px; }
+  .footer-grid { gap: 28px; }
+
+  /* Cartões de banco: um por linha, sem cortar o número do cartão. */
+  .bank-cards { scroll-snap-type: none; }
+  .bank-card { min-width: 100%; }
+
+  /* Resumos que hoje ficam lado a lado passam a empilhar, para o número
+     grande não ser cortado. */
+  .bank-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .kyc-resumo { grid-template-columns: 1fr 1fr; }
+
+  /* Ações de ficha, KYC e cartão: botões ocupam a linha inteira. */
+  .ficha-botoes, .ficha-acoes, .kyc-acoes, .kyc-upload-acoes, .bank-acoes-cartao {
+    flex-direction: column;
+  }
+  .ficha-botoes .btn, .ficha-acoes .btn, .kyc-acoes .btn,
+  .kyc-upload-acoes .btn, .bank-acoes-cartao .btn { width: 100%; }
+}
+
+/* Telas muito estreitas: 320–360px. */
+@media (max-width: 380px) {
+  .wrap { padding-left: 14px; padding-right: 14px; }
+  .card { padding: 16px; }
+  h1, .page-title { font-size: 26px; }
+  .kpi { font-size: 22px; }
+  .kyc-resumo { grid-template-columns: 1fr; }
+  .header .logo-image { width: clamp(104px, 46vw, 140px); }
+  .nav { font-size: 14px; gap: 8px 12px; }
+  .badge { font-size: 11px; padding: 3px 8px; }
+}
+
+/* Aparelho deitado com pouca altura: evita que o menu coma a tela toda. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .header { position: static; }
+  .hero { padding-top: 20px; }
+}
+
+/* Respeita quem pediu menos animação no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

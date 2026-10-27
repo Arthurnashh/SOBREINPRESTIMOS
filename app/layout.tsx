@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { COMPANY } from "@/lib/config";
 import CookieNotice from "@/components/CookieNotice";
 import "./globals.css";
@@ -8,7 +8,23 @@ import "./kyc.css";
 export const metadata: Metadata = {
   title: `${COMPANY.name} — Empréstimo pessoal sem taxa antecipada`,
   description:
-    "Simule empréstimos de R$ 1.000 a R$ 20.000 com custo total transparente, conta digital com PIX, cartão virtual e pagamento de boletos. Nenhum pagamento antecipado para liberar o crédito.",
+    "Simule empréstimos de R$ 500 a R$ 20.000 com custo total transparente, conta digital com PIX, cartão virtual e pagamento de boletos. Nenhum pagamento antecipado para liberar o crédito.",
+};
+
+/*
+ * Sem esta declaração o celular assume uma página de desktop (~980px) e
+ * encolhe tudo para caber — texto ilegível e botões difíceis de tocar.
+ * É a base de toda a responsividade.
+ *
+ * `viewportFit: "cover"` deixa o conteúdo usar a área segura em aparelhos com
+ * notch/ilha dinâmica. As margens de segurança são aplicadas no CSS, com
+ * env(safe-area-inset-*).
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0f3d2e",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

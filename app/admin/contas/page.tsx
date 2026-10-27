@@ -131,7 +131,7 @@ export default async function ContasPage({
                       <div>{i.full_name}</div>
                       <div className="fine">CPF {formatCpf(i.cpf)}</div>
                     </th>
-                    <td>
+                    <td data-label="Conta">
                       {i.number ? (
                         <>
                           <div>Ag. {i.agency}</div>
@@ -142,14 +142,14 @@ export default async function ContasPage({
                       )}
                       {i.conta_status === "bloqueada" && <span className="badge b-cancelado">Bloqueada</span>}
                     </td>
-                    <td>
+                    <td data-label="Saldo">
                       <strong>{brl(Number(i.balance ?? 0))}</strong>
                       {Number(i.overdraft ?? 0) > 0 && (
                         <div className="fine">limite {brl(Number(i.overdraft))}</div>
                       )}
                     </td>
-                    <td><SeloKyc status={i.kyc_status} /></td>
-                    <td>
+                    <td data-label="Verificação"><SeloKyc status={i.kyc_status} /></td>
+                    <td data-label="Cartão">
                       {i.cartao_last4 ? (
                         <>
                           <div>•••• {i.cartao_last4}</div>
@@ -159,7 +159,7 @@ export default async function ContasPage({
                         <span className="fine">—</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Movimento">
                       <div className="fine">{i.lancamentos} lançamento(s)</div>
                       <div className="fine">{i.pedidos} pedido(s)</div>
                     </td>

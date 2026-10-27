@@ -102,12 +102,12 @@ export default function Parcelas({
                   <th scope="row">
                     {p.numero}/{parcelas.length}
                   </th>
-                  <td>
+                  <td data-label="Vencimento">
                     {date(p.vencimento)}
                     {paga && p.pago_em && <div className="fine">paga em {date(p.pago_em)}</div>}
                   </td>
-                  <td>{brl(Number(p.valor))}</td>
-                  <td>
+                  <td data-label="Valor">{brl(Number(p.valor))}</td>
+                  <td data-label="Situação">
                     <span
                       className={
                         paga

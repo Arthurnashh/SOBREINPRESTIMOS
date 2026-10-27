@@ -391,10 +391,10 @@ export default function FichaConta({
               <tbody>
                 {extrato.map((t) => (
                   <tr key={String(t.id)}>
-                    <td>{txt(t.created_at) !== "—" ? date(String(t.created_at)) : "—"}</td>
-                    <td>{txt(t.kind)}</td>
-                    <td>{txt(t.description)}</td>
-                    <td>
+                    <td data-label="Data">{txt(t.created_at) !== "—" ? date(String(t.created_at)) : "—"}</td>
+                    <td data-label="Tipo">{txt(t.kind)}</td>
+                    <td data-label="Descrição">{txt(t.description)}</td>
+                    <td data-label="Valor">
                       {t.kind === "pix_envio" ||
                       t.kind === "transferencia_envio" ||
                       t.kind === "boleto" ||
