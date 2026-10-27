@@ -316,6 +316,59 @@
   transition: transform .15s ease, background .15s ease;
 }
 
+/* ------------------- ficha da conta (painel admin) -------------------- */
+.ficha-admin .kyc-bloco > header { margin-bottom: 4px; }
+
+.ficha-acoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--kyc-line);
+}
+
+.ficha-acao {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.ficha-acao label {
+  font: 600 13.5px var(--body);
+  color: var(--bk-deep, #0a3d2c);
+}
+
+.ficha-acao input {
+  border: 1px solid var(--kyc-line);
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 14.5px;
+  background: #fff;
+  width: 100%;
+}
+
+.ficha-acao input:focus {
+  outline: 2px solid var(--brand, #0e5a43);
+  outline-offset: 1px;
+}
+
+.ficha-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Em telas estreitas os botões da ficha ocupam a largura toda, para não
+   ficarem espremidos nem fora de alcance no celular. */
+@media (max-width: 560px) {
+  .ficha-botoes .bank-acao {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .kyc-bolinha.feito { background: #1a9e5f; }
 .kyc-bolinha.atual { background: var(--brand, #0e5a43); transform: scale(1.35); }
 

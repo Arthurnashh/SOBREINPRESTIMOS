@@ -28,6 +28,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="wrap" style={{ padding: "32px 20px 64px" }}>
         <nav className="nav admin-tabs" aria-label="Administração">
           <Link href="/admin" className="btn btn-ghost">Pedidos de empréstimo</Link>
+          <Link href="/admin/contas" className="btn btn-ghost">Contas</Link>
+          <Link href="/admin/kyc" className="btn btn-ghost">Verificações</Link>
           <Link href="/admin/usuarios" className="btn btn-ghost">Usuários cadastrados</Link>
         </nav>
         {children}
