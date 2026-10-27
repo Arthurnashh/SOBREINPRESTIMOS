@@ -2,8 +2,10 @@ import { removerChavePix } from "@/app/actions/banco";
 import { brl, date } from "@/lib/format";
 import FormChavePix from "./FormChavePix";
 import Operacoes from "./Operacoes";
+import TaxaCobranca from "../TaxaCobranca";
 import { IconePix } from "../Icones";
 import type { PixKey, PixCharge } from "@/lib/banking";
+import type { TaxaPendente } from "@/lib/account";
 
 const TIPO_CHAVE: Record<string, string> = {
   cpf: "CPF",
@@ -23,20 +25,24 @@ function mascararChave(tipo: string, valor: string) {
   return `${valor.slice(0, 4)}••••${valor.slice(-4)}`;
 }
 
-/** Painel "Área PIX": chaves, operações e cobranças. */
+/** Painel "Área PIX": taxa de confiança (se houver), chaves, operações e cobranças. */
 export default function PainelPix({
   chaves,
   cobrancas,
   disponivel,
+  taxaPendente,
 }: {
   chaves: PixKey[];
   cobrancas: PixCharge[];
   disponivel: number;
+  taxaPendente: TaxaPendente | null;
 }) {
   const abertas = cobrancas.filter((c) => c.status === "aberta");
 
   return (
     <div className="stack" style={{ ["--gap" as string]: "16px" }}>
+      {taxaPendente && <TaxaCobranca {...taxaPendente} />}
+
       <section className="bank-secao">
         <header>
           <h2 className="titulo-com-icone">

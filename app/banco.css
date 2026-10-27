@@ -373,6 +373,53 @@
 
 .bank-acoes-cartao { display: flex; flex-wrap: wrap; gap: 10px; }
 
+/* ------------------- taxa de confiança (aviso + bloco) ----------------- */
+/* Bloco inline da Área PIX: mesma casca de .bank-secao, com destaque âmbar
+   para não se confundir com as seções comuns de chaves e cobranças. */
+.taxa-bloco {
+  border-color: #f0dcae;
+  background: linear-gradient(180deg, var(--warn-bg) 0%, #fff 62%);
+}
+.taxa-bloco > header h2 { color: var(--warn-ink); }
+.taxa-bloco .pix-qr { max-width: 240px; }
+.taxa-pago { border-color: #cfe6d5; background: #f4fbf6; }
+.taxa-pago h2 { color: #1d6b3a; }
+
+/* Faixa do topo da conta: o saldo do empréstimo aparece creditado, mas
+   bloqueado no banco. Sem este aviso o cliente veria o valor, tentaria usar
+   e receberia um erro sem explicação. */
+.aviso-taxa {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 13px 16px;
+  border: 1px solid #f0dcae;
+  border-radius: 14px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  font-size: 14.5px;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease;
+}
+.aviso-taxa:hover { background: #fff2d6; border-color: #e6cb90; }
+.aviso-taxa strong { font-weight: 700; }
+.aviso-taxa-icone {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #7a4b00;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: var(--mono);
+  line-height: 1;
+}
+
 /* --------------------------- responsivo ------------------------------- */
 @media (max-width: 880px) {
   .bank-shell { padding: 18px 14px 26px; border-radius: 24px; margin: 0; }

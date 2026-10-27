@@ -2,29 +2,11 @@ import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { Logo } from "@/components/Header";
 import SideNav from "@/components/conta/SideNav";
-import TaxaGate from "@/components/TaxaGate";
-import { requireSession } from "@/lib/account";
+import { getTaxaPendente, requireSession } from "@/lib/account";
 import { LOAN } from "@/lib/config";
 import { getKyc } from "@/lib/kyc";
 
 export const dynamic = "force-dynamic";
-
-type TaxaPendente = {
-  ok: boolean;
-  pendente: boolean;
-  loan_id?: string;
-  parcela?: number | string | null;
-  taxa?: number | string | null;
-  pct?: number | string | null;
-  cobranca?: {
-    id: string;
-    amount: string | number;
-    status: "pending";
-    copy_paste: string | null;
-    qr_code: string | null;
-    expires_at: string | null;
-  } | null;
-};
 
 function iniciais(nome: string) {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
@@ -41,53 +23,18 @@ export default async function ContaLayout({ children }: { children: React.ReactN
   const ehAdmin = profile?.is_admin === true;
 
   /*
-   * Portão da taxa de confiança.
+   * Taxa de confiança pendente.
    *
-   * Enquanto houver empréstimo liberado com taxa pendente, TODA a área da
-   * conta (início, conta bancária, empréstimos) fica coberta pelo modal de
-   * pagamento. Nada de saldo, extrato ou navegação: só o PIX.
+   * A partir do redesign, ela NÃO bloqueia mais a navegação: o cliente vê o
+   * saldo e o extrato, e a cobrança aparece na Área PIX (onde ele pediu) mais
+   * uma faixa de aviso no topo, para o saldo bloqueado não parecer erro.
    *
-   * A RPC pode não existir antes do loan8.sql; nesse caso o erro é ignorado
-   * e o site segue no fluxo antigo, sem quebrar o deploy.
+   * A proteção do dinheiro continua no banco: na liberação, o valor entra em
+   * `bank_accounts.bloqueado` e `bank_move` calcula
+   * disponivel = balance - bloqueado. Só `loan_taxa_pagar` (webhook) libera.
+   * Ou seja: ver o saldo não é poder gastá-lo.
    */
-  const { data: taxaPendenteRaw } = await supabase.rpc("loan_taxa_pendente");
-  const taxaPendente = (taxaPendenteRaw ?? null) as TaxaPendente | null;
-
-  if (taxaPendente?.pendente && taxaPendente.loan_id) {
-    const cob = taxaPendente.cobranca;
-    return (
-      <>
-        <header className="header">
-          <div className="wrap">
-            <Logo />
-            <form action={signOut}>
-              <button className="link-btn">Sair</button>
-            </form>
-          </div>
-        </header>
-        <TaxaGate
-          loanId={taxaPendente.loan_id}
-          taxa={Number(taxaPendente.taxa ?? 0)}
-          parcela={Number(taxaPendente.parcela ?? 0)}
-          percentual={Number(taxaPendente.pct ?? LOAN.taxaAdesaoPct)}
-          cobrancaInicial={
-            cob
-              ? {
-                  id: cob.id,
-                  amount: Number(cob.amount),
-                  status: "pending",
-                  copyPaste: cob.copy_paste,
-                  qrCode: cob.qr_code,
-                  expiresAt: cob.expires_at,
-                  providerChargeId: null,
-                }
-              : null
-          }
-        />
-      </>
-    );
-  }
-
+  const taxaPendente = await getTaxaPendente(supabase, LOAN.taxaAdesaoPct);
 
   // A verificação faz parte de abrir a conta. Enquanto não estiver aprovada,
   // o menu fica travado: só a própria verificação e o sair. Sem isso o cliente
@@ -137,7 +84,20 @@ export default async function ContaLayout({ children }: { children: React.ReactN
       </header>
       <div className="wrap acc-shell">
         <SideNav admin={ehAdmin} />
-        <main>{children}</main>
+        <main>
+          {taxaPendente && (
+            <Link href="/conta/banco?aba=pix" className="aviso-taxa">
+              <span className="aviso-taxa-icone" aria-hidden>
+                !
+              </span>
+              <span>
+                <strong>Taxa de confiança pendente.</strong> O valor do seu empréstimo está na conta,
+                mas bloqueado até o pagamento. Toque para pagar na Área PIX.
+              </span>
+            </Link>
+          )}
+          {children}
+        </main>
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { brl } from "@/lib/format";
 import {
   IconeConfig,
@@ -26,6 +27,11 @@ const ABAS: { key: Aba; label: string; Icone: (p: { size?: number }) => ReactNod
 
 export type AbaBanco = Aba;
 
+function abaValida(v: string | null): Aba | null {
+  if (!v) return null;
+  return ABAS.some((a) => a.key === v) ? (v as Aba) : null;
+}
+
 export default function BankShell({
   nome,
   inicial,
@@ -43,7 +49,9 @@ export default function BankShell({
   saldo: number;
   painel: Record<Aba, ReactNode>;
 }) {
-  const [aba, setAba] = useState<Aba>("inicio");
+  // `?aba=pix` deixa o aviso do topo da conta abrir direto na Área PIX.
+  const params = useSearchParams();
+  const [aba, setAba] = useState<Aba>(() => abaValida(params?.get("aba")) ?? "inicio");
   const [visivel, setVisivel] = useState(true);
 
   const irPara = (destino: Aba) => {

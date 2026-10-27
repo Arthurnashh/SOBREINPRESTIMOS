@@ -59,3 +59,80 @@ export const requireAdmin = cache(async () => {
   if (!ctx.profile?.is_admin) redirect("/conta");
   return ctx;
 });
+
+/** Cobrança da taxa de confiança pendente, como devolvida pela RPC. */
+type TaxaPendenteRow = {
+  ok: boolean;
+  pendente: boolean;
+  loan_id?: string;
+  parcela?: number | string | null;
+  taxa?: number | string | null;
+  pct?: number | string | null;
+  cobranca?: {
+    id: string;
+    amount: string | number;
+    status: "pending";
+    copy_paste: string | null;
+    qr_code: string | null;
+    expires_at: string | null;
+  } | null;
+};
+
+export type TaxaPendente = {
+  loanId: string;
+  taxa: number;
+  parcela: number;
+  percentual: number;
+  cobrancaInicial: {
+    id: string;
+    amount: number;
+    status: "pending";
+    copyPaste: string | null;
+    qrCode: string | null;
+    expiresAt: string | null;
+    providerChargeId: null;
+  } | null;
+};
+
+/**
+ * Taxa de confiança em aberto do cliente, pronta para os componentes de UI.
+ *
+ * O saldo do empréstimo fica creditado e bloqueado no banco até o PIX ser
+ * confirmado (`loan_taxa_pagar`, chamado pelo webhook). A cobrança aparece na
+ * Área PIX e no aviso do topo da conta — deixar de bloquear a navegação não
+ * expõe o dinheiro, porque quem impede o gasto é `bank_accounts.bloqueado`,
+ * não a tela.
+ *
+ * A RPC pode não existir antes do loan8.sql; nesse caso devolve null e o site
+ * segue no fluxo antigo, sem quebrar o deploy.
+ */
+export const getTaxaPendente = cache(
+  async (supabase: Awaited<ReturnType<typeof createClient>>, pctPadrao: number): Promise<TaxaPendente | null> => {
+    try {
+      const { data } = await supabase.rpc("loan_taxa_pendente");
+      const row = (data ?? null) as TaxaPendenteRow | null;
+      if (!row?.pendente || !row.loan_id) return null;
+
+      const cob = row.cobranca;
+      return {
+        loanId: row.loan_id,
+        taxa: Number(row.taxa ?? 0),
+        parcela: Number(row.parcela ?? 0),
+        percentual: Number(row.pct ?? pctPadrao),
+        cobrancaInicial: cob
+          ? {
+              id: cob.id,
+              amount: Number(cob.amount),
+              status: "pending",
+              copyPaste: cob.copy_paste,
+              qrCode: cob.qr_code,
+              expiresAt: cob.expires_at,
+              providerChargeId: null,
+            }
+          : null,
+      };
+    } catch {
+      return null;
+    }
+  }
+);

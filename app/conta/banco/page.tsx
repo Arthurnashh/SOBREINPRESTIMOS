@@ -1,6 +1,7 @@
-import { requireSession } from "@/lib/account";
+import { getTaxaPendente, requireSession } from "@/lib/account";
 import { getBanking } from "@/lib/banking";
 import { getKyc } from "@/lib/kyc";
+import { LOAN } from "@/lib/config";
 import BankShell from "@/components/banco/BankShell";
 import PainelInicio from "@/components/banco/PainelInicio";
 import PainelPix from "@/components/banco/PainelPix";
@@ -44,6 +45,7 @@ export default async function BancoPage() {
     dados,
     limites,
     kyc,
+    taxaPendente,
   ] = await Promise.all([
     bank.getAccount(),
     bank.getCard(),
@@ -61,6 +63,7 @@ export default async function BancoPage() {
     bank.getProfile(),
     bank.getLimits(),
     getKyc(supabase).meuStatus(),
+    getTaxaPendente(supabase, LOAN.taxaAdesaoPct),
   ]);
 
   const kycStatus = kyc.ok ? kyc.data.status : "nao_iniciado";
@@ -97,7 +100,14 @@ export default async function BancoPage() {
             kycStatus={kycStatus}
           />
         ),
-        pix: <PainelPix chaves={chaves} cobrancas={cobrancas} disponivel={account.available} />,
+        pix: (
+          <PainelPix
+            chaves={chaves}
+            cobrancas={cobrancas}
+            disponivel={account.available}
+            taxaPendente={taxaPendente}
+          />
+        ),
         cartoes: (
           <PainelCartoes
             card={card}
