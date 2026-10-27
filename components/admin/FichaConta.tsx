@@ -11,6 +11,7 @@ import {
 import { brl, date, formatCpf } from "@/lib/format";
 import { KYC_STATUS_LABEL, type KycStatus } from "@/lib/kyc";
 import { IconeEscudo, IconeCadeado, IconeCadeadoAberto, IconeCartao } from "../Icones";
+import ZonaPerigo from "./ZonaPerigo";
 
 const ROTULO_FOTO: Record<string, string> = {
   doc_frente: "Documento — frente",
@@ -438,6 +439,9 @@ export default function FichaConta({
           </ul>
         )}
       </div>
+
+      {/* --------------------- suspender / excluir ---------------------- */}
+      <ZonaPerigo userId={userId} statusConta={(conta?.status as string) ?? null} />
 
       {/* --------------------------- auditoria --------------------------- */}
       <div className="kyc-bloco">

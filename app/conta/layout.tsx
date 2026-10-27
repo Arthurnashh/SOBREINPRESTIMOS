@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
+import ContaSuspensa from "@/components/ContaSuspensa";
 import { Logo } from "@/components/Header";
 import SideNav from "@/components/conta/SideNav";
 import TaxaConfirmada from "@/components/TaxaConfirmada";
-import { getTaxaConfirmada, getTaxaPendente, requireSession } from "@/lib/account";
+import {
+  getContaEstado,
+  getTaxaConfirmada,
+  getTaxaPendente,
+  requireSession,
+} from "@/lib/account";
 import { LOAN } from "@/lib/config";
 import { getKyc } from "@/lib/kyc";
 
@@ -22,6 +28,19 @@ export default async function ContaLayout({ children }: { children: React.ReactN
   // A rota /admin tem a própria checagem em requireAdmin(), então esconder
   // o link é a primeira camada, não a única.
   const ehAdmin = profile?.is_admin === true;
+
+  /*
+   * Conta suspensa pelo administrador.
+   *
+   * O cliente continua autenticado (nada foi apagado), então em vez de
+   * derrubá-lo no login com um erro genérico, mostramos o motivo e o caminho
+   * de contato. É o par brando do "excluir conta", que apaga de verdade.
+   *
+   * O administrador não é barrado aqui: ele precisa entrar para poder
+   * reativar a conta de quem suspendeu.
+   */
+  const estado = await getContaEstado(supabase);
+  if (estado?.suspensa && !ehAdmin) return <ContaSuspensa />;
 
   /*
    * Taxa de confiança pendente.

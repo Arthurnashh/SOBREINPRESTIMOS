@@ -132,6 +132,9 @@ function traduzirErro(msg: string): string {
   if (/limite de segurança/i.test(msg)) return "Valor acima do limite permitido.";
   if (/própria conta/i.test(msg)) return "Você não pode fazer isso na própria conta.";
   if (/cartão não encontrado/i.test(msg)) return "Este cliente não tem cartão.";
+  if (/conta de administrador/i.test(msg)) return "Contas de administrador não podem ser suspensas nem excluídas.";
+  if (/tem saldo/i.test(msg)) return "A conta tem saldo. Zere o saldo antes de excluir.";
+  if (/em andamento/i.test(msg)) return "Há empréstimo em andamento. Resolva antes de excluir.";
   return msg;
 }
 
@@ -207,4 +210,151 @@ export async function bloquearCartaoAdmin(
 
   revalidatePath(`/admin/contas/${userId}`);
   return { ok: bloquear ? "Cartão bloqueado." : "Cartão desbloqueado." };
+}
+
+/* =====================================================================
+   Suspender e excluir conta
+   =====================================================================
+   Duas ações bem diferentes:
+
+     desativarContaAdmin  → status 'encerrada'. O cliente continua logado e
+                            vê o aviso de conta suspensa. Reversível.
+     excluirContaAdmin    → apaga o usuário. O CASCADE leva junto conta,
+                            cartão, extrato, KYC e pedidos. Irreversível.
+
+   Como nas demais, quem autoriza é o banco (is_admin() dentro do RPC).
+*/
+
+export type PreviaExclusao = {
+  error?: string;
+  dados?: {
+    nome: string | null;
+    cpf: string | null;
+    ehAdmin: boolean;
+    saldo: number;
+    bloqueado: number;
+    emprestimos: number;
+    emprestimosAtivos: number;
+    kyc: number;
+    taxasPagas: number;
+    transacoes: number;
+    impedimentos: string[];
+  };
+};
+
+type PreviaRow = {
+  ok: boolean;
+  nome: string | null;
+  cpf: string | null;
+  eh_admin: boolean;
+  saldo: number | string;
+  bloqueado: number | string;
+  emprestimos: number;
+  emprestimos_ativos: number;
+  kyc: number;
+  taxas_pagas: number;
+  transacoes: number;
+  impedimentos: string[];
+};
+
+/** O que será perdido, para o admin confirmar com número na mão. */
+export async function previaExclusaoAdmin(userId: string): Promise<PreviaExclusao> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("admin_previa_exclusao", { p_user_id: userId });
+  if (error) return { error: traduzirErro(error.message) };
+
+  const row = data as PreviaRow | null;
+  if (!row?.ok) return { error: "Não foi possível montar a prévia." };
+
+  return {
+    dados: {
+      nome: row.nome,
+      cpf: row.cpf,
+      ehAdmin: row.eh_admin === true,
+      saldo: Number(row.saldo ?? 0),
+      bloqueado: Number(row.bloqueado ?? 0),
+      emprestimos: Number(row.emprestimos ?? 0),
+      emprestimosAtivos: Number(row.emprestimos_ativos ?? 0),
+      kyc: Number(row.kyc ?? 0),
+      taxasPagas: Number(row.taxas_pagas ?? 0),
+      transacoes: Number(row.transacoes ?? 0),
+      impedimentos: Array.isArray(row.impedimentos) ? row.impedimentos : [],
+    },
+  };
+}
+
+export async function desativarContaAdmin(
+  userId: string,
+  desativar: boolean,
+  motivo: string
+): Promise<AcaoConta> {
+  await requireAdmin();
+  if (motivo.trim().length < 5) return { error: "Informe o motivo (mínimo 5 caracteres)." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_desativar_conta", {
+    p_user_id: userId,
+    p_motivo: motivo.trim(),
+    p_reativar: !desativar,
+  });
+  if (error) return { error: traduzirErro(error.message) };
+
+  revalidatePath(`/admin/contas/${userId}`);
+  revalidatePath("/admin/contas");
+  revalidatePath("/conta");
+  return {
+    ok: desativar
+      ? "Conta suspensa. O acesso do cliente fica bloqueado até a reativação."
+      : "Conta reativada. O cliente volta a ter acesso normal.",
+  };
+}
+
+export async function excluirContaAdmin(
+  userId: string,
+  motivo: string,
+  forcar: boolean,
+  confirmacao: string
+): Promise<AcaoConta> {
+  await requireAdmin();
+
+  // Exclusão é irreversível: exigimos o motivo longo E o CPF/nome digitado.
+  // O RPC também confere o motivo; aqui é para dar erro claro antes da ida ao
+  // banco e evitar clique acidental.
+  if (motivo.trim().length < 10) {
+    return { error: "Informe o motivo com pelo menos 10 caracteres." };
+  }
+  if (confirmacao.trim().length < 3) {
+    return { error: "Digite o CPF ou o nome do cliente para confirmar." };
+  }
+
+  const supabase = await createClient();
+
+  // Confere a confirmação contra o cadastro real — não confiamos só no que
+  // foi digitado, senão a trava vira um campo decorativo.
+  const { data: previa } = await supabase.rpc("admin_previa_exclusao", { p_user_id: userId });
+  const row = previa as PreviaRow | null;
+  if (!row?.ok) return { error: "Conta não encontrada." };
+
+  const digitado = confirmacao.replace(/\D/g, "");
+  const cpfReal = (row.cpf ?? "").replace(/\D/g, "");
+  const nomeReal = (row.nome ?? "").trim().toLowerCase();
+  const bateCpf = digitado.length >= 11 && cpfReal && digitado === cpfReal;
+  const bateNome = nomeReal.length >= 3 && confirmacao.trim().toLowerCase() === nomeReal;
+
+  if (!bateCpf && !bateNome) {
+    return { error: "A confirmação não bate com o CPF nem com o nome completo do cliente." };
+  }
+
+  const { error } = await supabase.rpc("admin_excluir_conta", {
+    p_user_id: userId,
+    p_motivo: motivo.trim(),
+    p_forcar: forcar,
+  });
+  if (error) return { error: traduzirErro(error.message) };
+
+  revalidatePath("/admin/contas");
+  revalidatePath("/admin");
+  return { ok: "Conta excluída. O registro ficou na trilha de auditoria." };
 }

@@ -739,6 +739,87 @@
   text-decoration: underline;
 }
 
+/* ------------------ tela de conta suspensa (cliente) ------------------ */
+.suspensa-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: 40px 20px 72px;
+}
+
+.suspensa-card {
+  max-width: 560px;
+  width: 100%;
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+
+.suspensa-card h1 { font-size: 28px; letter-spacing: -0.02em; }
+.suspensa-card h2 { font-size: 18px; margin-top: 6px; }
+
+.suspensa-icone {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: var(--warn-bg, #fff8e8);
+  border: 1px solid #f0dcae;
+  color: var(--warn-ink, #7a4b00);
+  font: 700 22px var(--mono, monospace);
+}
+
+/* ------------------- zona de perigo (ficha do admin) ------------------ */
+.zona-perigo { border-color: #efd5d5; }
+.zona-perigo > header h2 { color: #8a2f2f; }
+
+.perigo-estado {
+  display: grid;
+  gap: 3px;
+  padding: 12px 15px;
+  border-radius: 12px;
+  background: #f4fbf6;
+  border: 1px solid #cfe6d5;
+  font-size: 13.5px;
+}
+.perigo-estado strong { color: #1d6b3a; font-size: 14.5px; }
+.perigo-estado span { color: var(--muted); }
+.perigo-estado.suspensa { background: #fff8e8; border-color: #f0dcae; }
+.perigo-estado.suspensa strong { color: #7a4b00; }
+
+.perigo-exclusao {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 16px;
+  border: 1px solid #efd5d5;
+  border-radius: 14px;
+  background: #fdf7f7;
+}
+.perigo-exclusao h3 { font-size: 15px; color: #8a2f2f; }
+
+.perigo-lista {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+  font-size: 13.5px;
+  color: var(--ink, #0a2544);
+  list-style: disc;
+}
+
+.perigo-forcar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #8a2f2f;
+}
+.perigo-forcar input { width: auto; }
+
+.perigo-exclusao .bank-acao.perigo { justify-content: center; }
+
 @media (max-width: 880px) {
   .kyc-topo,
   .kyc-bloco { padding: 18px 16px; }
@@ -746,4 +827,5 @@
   .kyc-trilha { gap: 6px; }
   .kyc-etapa { padding: 7px 11px; font-size: 12px; }
   .kyc-fotos { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  .suspensa-wrap { padding: 24px 14px 56px; }
 }

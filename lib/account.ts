@@ -188,3 +188,27 @@ export const getTaxaConfirmada = cache(
     }
   }
 );
+
+/**
+ * Estado da conta do próprio cliente.
+ *
+ * Usado pelo layout da conta para trocar o conteúdo pela tela de aviso quando
+ * a conta foi suspensa pelo administrador. A RPC devolve `suspensa: true`
+ * quando `bank_accounts.status = 'encerrada'`, que é o que
+ * `admin_desativar_conta` grava. Nada é apagado nesse caminho — é reversível.
+ *
+ * Se a RPC ainda não existir (admin4.sql não aplicado), devolve null e o site
+ * segue no fluxo normal, sem quebrar o deploy.
+ */
+export const getContaEstado = cache(
+  async (supabase: Awaited<ReturnType<typeof createClient>>): Promise<{ suspensa: boolean } | null> => {
+    try {
+      const { data } = await supabase.rpc("minha_conta_estado");
+      const row = (data ?? null) as { ok?: boolean; existe?: boolean; suspensa?: boolean } | null;
+      if (!row?.ok) return null;
+      return { suspensa: row.suspensa === true };
+    } catch {
+      return null;
+    }
+  }
+);
