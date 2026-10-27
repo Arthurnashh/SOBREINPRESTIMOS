@@ -3,13 +3,26 @@
    Usa as mesmas variáveis do tema: --brand, --brand-soft, --accent.
    ===================================================================== */
 
-.bank-shell {
+/*
+ * As variáveis --bk* ficavam declaradas dentro de `.bank-shell`. Isso quebrava
+ * qualquer uso de `.bank-acao` FORA desse container: a página de verificação do
+ * KYC usa apenas `.wrap.narrow`, então `var(--bk)` não resolvia, o fundo do
+ * botão principal virava transparente e o texto continuava branco — botão
+ * invisível (branco no branco), embora clicável.
+ *
+ * Declaradas em :root, valem em toda a aplicação; a regra em `.bank-shell`
+ * continua existindo para o caso de a área bancária querer sobrescrever.
+ */
+:root {
   --bk: var(--brand);            /* verde principal */
   --bk-2: #16775a;               /* verde um tom acima */
   --bk-deep: #0a3d2c;            /* verde profundo */
   --bk-soft: #eef4f0;            /* verde de fundo, bem claro */
   --bk-line: #d8e6de;
   --bk-radius: 22px;
+}
+
+.bank-shell {
   background: var(--bk-soft);
   border-radius: 28px;
   padding: 28px 24px 40px;
@@ -197,14 +210,16 @@
 /* botão de ação com ícone */
 .bank-acao {
   display: inline-flex; align-items: center; gap: 9px;
-  border: 1px solid var(--bk-line); background: #fff; color: var(--bk-deep);
+  border: 1px solid var(--bk-line, #d8e6de); background: #fff; color: var(--bk-deep, #0a3d2c);
   border-radius: 13px; padding: 11px 16px; cursor: pointer;
   font: 600 13.5px var(--body);
   transition: background .14s ease, border-color .14s ease;
 }
-.bank-acao:hover { background: var(--bk-soft); border-color: #bcd4c7; }
+.bank-acao:hover { background: var(--bk-soft, #eef4f0); border-color: #bcd4c7; }
 .bank-acao.principal {
-  background: var(--bk); color: #fff; border-color: transparent;
+  /* A cor de reserva garante que o botão NUNCA fique invisível (texto branco
+     em fundo transparente) caso a variável não resolva por algum motivo. */
+  background: var(--bk, #0e5a43); color: #fff; border-color: transparent;
 }
 .bank-acao.principal:hover { background: var(--bk-deep); }
 .bank-acao.perigo { color: #8a2f2f; border-color: #eccfcf; }
