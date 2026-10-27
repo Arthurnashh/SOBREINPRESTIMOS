@@ -317,13 +317,13 @@ where p.is_admin = true;
 **Authentication → URL Configuration**:
 
 - **Site URL**: `http://localhost:3000` enquanto testa local.
-  Depois do deploy, troque para `https://SEU-PROJETO.vercel.app`.
+  Depois do deploy, troque para `https://site-pearl-nine-93.vercel.app`.
 - **Redirect URLs**, adicione todas:
   ```
   http://localhost:3000/auth/callback
   http://localhost:3000/auth/callback?next=/redefinir-senha
-  https://SEU-PROJETO.vercel.app/auth/callback
-  https://SEU-PROJETO.vercel.app/auth/callback?next=/redefinir-senha
+  https://site-pearl-nine-93.vercel.app/auth/callback
+  https://site-pearl-nine-93.vercel.app/auth/callback?next=/redefinir-senha
   ```
 
 Sem isso, confirmação de e-mail e recuperação de senha quebram com erro de redirect.
@@ -421,7 +421,7 @@ npx supabase db query --linked -f supabase/_reset.sql
    |---|---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxx.supabase.co` | Config |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | a anon key | Config |
-   | `NEXT_PUBLIC_SITE_URL` | `https://SEU-PROJETO.vercel.app` | Config |
+   | `NEXT_PUBLIC_SITE_URL` | `https://site-pearl-nine-93.vercel.app` | Config |
    | `NEXT_PUBLIC_EMPRESA_NOME` | nome real da empresa | Config |
    | `NEXT_PUBLIC_EMPRESA_CNPJ` | CNPJ real (deixe vazio se não tiver — o rodapé omite) | Config |
    | `NEXT_PUBLIC_INSTITUICAO_PARCEIRA` | instituição parceira real (vazio = texto genérico) | Config |
@@ -449,7 +449,7 @@ npx supabase db query --linked -f supabase/_reset.sql
    `/api/cron/agendamentos`. Confirme em Vercel → Settings → Cron Jobs.
    Plano Hobby permite cron **uma vez por dia** — suficiente para agendamentos.
 6. Volte no Supabase e ajuste **Site URL** e **Redirect URLs** para o domínio
-   `.vercel.app`, incluindo `https://SEU-PROJETO.vercel.app/auth/callback`.
+   `.vercel.app`, incluindo `https://site-pearl-nine-93.vercel.app/auth/callback`.
 7. Refaça o roteiro de teste no domínio publicado.
 
 ## Passo 7 — Depois do deploy

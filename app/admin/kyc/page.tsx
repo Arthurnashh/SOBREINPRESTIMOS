@@ -19,7 +19,7 @@ export default async function AdminKycPage() {
   const itens: KycFilaItem[] = fila.ok ? fila.data : [];
 
   return (
-    <main className="wrap" style={{ paddingTop: 28, paddingBottom: 56 }}>
+    <main>
       <p className="fine" style={{ marginBottom: 10 }}>
         <Link href="/admin">← Voltar ao painel</Link>
       </p>

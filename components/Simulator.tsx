@@ -129,7 +129,7 @@ export default function Simulator({ mode, initialAmount = 5000, initialInstallme
             <dt>Total a pagar</dt>
             <dd>{brl(sim.total)}</dd>
           </div>
-          <div>
+          <div className="cet">
             <dt>CET</dt>
             <dd>
               {pct(sim.cetMonthly)} a.m. · {pct(sim.cetYearly)} a.a.

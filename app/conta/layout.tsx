@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { Logo } from "@/components/Header";
+import SideNav from "@/components/conta/SideNav";
 import TaxaGate from "@/components/TaxaGate";
 import { requireSession } from "@/lib/account";
 import { LOAN } from "@/lib/config";
@@ -24,6 +25,12 @@ type TaxaPendente = {
     expires_at: string | null;
   } | null;
 };
+
+function iniciais(nome: string) {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return "?";
+  return ((partes[0][0] ?? "") + (partes[partes.length - 1][0] ?? "")).toUpperCase();
+}
 
 export default async function ContaLayout({ children }: { children: React.ReactNode }) {
   const { profile, supabase } = await requireSession();
@@ -103,12 +110,7 @@ export default async function ContaLayout({ children }: { children: React.ReactN
           </div>
         </header>
         <div className="wrap acc-shell">
-          <nav className="side" aria-label="Conta">
-            <Link href="/conta/verificacao">Minha verificação</Link>
-            <form action={signOut}>
-              <button className="link-btn">Sair</button>
-            </form>
-          </nav>
+          <SideNav travado />
           <main>{children}</main>
         </div>
       </>
@@ -120,23 +122,21 @@ export default async function ContaLayout({ children }: { children: React.ReactN
       <header className="header">
         <div className="wrap">
           <Logo />
-          <Link href="/conta/emprestimo" className="btn btn-primary">
-            Pedir empréstimo
-          </Link>
+          <div className="acc-actions">
+            <Link href="/conta" className="acc-user">
+              <span className="avatar" aria-hidden>
+                {iniciais(profile?.full_name ?? "")}
+              </span>
+              <span>{profile?.full_name?.split(/\s+/)[0] ?? "Minha conta"}</span>
+            </Link>
+            <Link href="/conta/emprestimo" className="btn btn-primary">
+              Pedir empréstimo
+            </Link>
+          </div>
         </div>
       </header>
       <div className="wrap acc-shell">
-        <nav className="side" aria-label="Conta">
-          <Link href="/conta">Início</Link>
-          <Link href="/conta/banco">Conta bancária</Link>
-          <Link href="/conta/emprestimos">Meus empréstimos</Link>
-          <Link href="/conta/verificacao">Minha verificação</Link>
-          <Link href="/conta/emprestimo">Empréstimo</Link>
-          {ehAdmin ? <Link href="/admin">Administração</Link> : null}
-          <form action={signOut}>
-            <button className="link-btn">Sair</button>
-          </form>
-        </nav>
+        <SideNav admin={ehAdmin} />
         <main>{children}</main>
       </div>
     </>

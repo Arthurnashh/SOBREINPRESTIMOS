@@ -1,4 +1,4 @@
-import Header from "@/components/Header";
+import AuthShell from "@/components/AuthShell";
 import { SignUpForm } from "@/components/AuthForms";
 import { isValidRequest } from "@/lib/loan";
 
@@ -13,11 +13,8 @@ export default async function CadastroPage({
     : undefined;
 
   return (
-    <>
-      <Header />
-      <main className="auth">
-        <SignUpForm intent={intent} />
-      </main>
-    </>
+    <AuthShell>
+      <SignUpForm intent={intent} />
+    </AuthShell>
   );
 }

@@ -79,7 +79,7 @@ export default async function ContasPage({
           ["Sem verificação", String(semKyc)],
           ["Bloqueadas", String(bloqueadas)],
         ] as const).map(([rotulo, valor]) => (
-          <div className="card" key={rotulo}>
+          <div className="card kpi-card" key={rotulo}>
             <div className="kpi-label">{rotulo}</div>
             <div className="kpi" style={{ fontSize: 26 }}>{valor}</div>
           </div>

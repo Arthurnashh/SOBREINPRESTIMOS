@@ -16,9 +16,10 @@ type Config = {
 };
 
 function urlBase(host: string | null, proto: string) {
+  const env = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+  if (/^https:\/\//.test(env) && !/localhost/.test(env)) return env;
   if (host && !/^localhost|^127\./.test(host)) return `${proto}://${host}`;
-  const env = process.env.NEXT_PUBLIC_SITE_URL ?? "";
-  return env.replace(/\/$/, "");
+  return env;
 }
 
 export default async function AdminConfigPage() {

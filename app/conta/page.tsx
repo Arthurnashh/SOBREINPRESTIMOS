@@ -40,9 +40,15 @@ export default async function ContaPage({
 
   return (
     <div className="stack" style={{ ["--gap" as string]: "20px" }}>
-      <div>
-        <h1 className="page-title">Olá, {firstName}</h1>
-        <p className="muted">Aqui está o resumo da sua conta.</p>
+      <div className="conta-top">
+        <div>
+          <span className="eyebrow">Sua conta</span>
+          <h1 className="page-title">Olá, {firstName}</h1>
+          <p className="muted">Aqui está o resumo da sua conta.</p>
+        </div>
+        <Link href="/conta/banco" className="btn btn-dark">
+          Abrir conta bancária
+        </Link>
       </div>
 
       {pedido === "enviado" && (
@@ -55,7 +61,7 @@ export default async function ContaPage({
       )}
 
       <div className="grid-2">
-        <section className="card">
+        <section className="card card-saldo">
           <div className="kpi-label">Saldo disponível</div>
           {account ? (
             <>
@@ -82,7 +88,7 @@ export default async function ContaPage({
           )}
         </section>
 
-        <section className="card">
+        <section className="card card-credito">
           <div className="kpi-label">Crédito</div>
           <div className="kpi">até {brl(20000)}</div>
           <p className="muted" style={{ marginTop: 6 }}>
@@ -121,7 +127,7 @@ export default async function ContaPage({
                     </div>
                     {l.decision_note && <div className="fine">{l.decision_note}</div>}
                   </div>
-                  <div style={{ textAlign: "right" }}>
+                  <div className="pedido-lado">
                     <span className={`badge b-${l.status}`}>{STATUS_LABEL[l.status]}</span>
                     {l.status === "em_analise" && (
                       <form action={cancelLoan} style={{ marginTop: 8 }}>
@@ -138,7 +144,7 @@ export default async function ContaPage({
       </section>
 
       <section className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div className="secao-head">
           <h2 style={{ fontSize: 22, marginBottom: 8 }}>Últimas movimentações</h2>
           <Link href="/conta/banco" className="link-btn">
             Ver extrato completo

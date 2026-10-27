@@ -48,14 +48,14 @@ export default async function AdminHome({
         <p className="muted">Analise, aprove ou recuse as solicitações.</p>
       </div>
 
-      <div className="grid-2" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+      <div className="kpi-grid">
         {([
           ["Em análise", count("em_analise")],
           ["Aprovados", count("aprovado")],
           ["Liberados", count("liberado")],
           ["Recusados", count("recusado")],
         ] as const).map(([label, n]) => (
-          <div className="card" key={label}>
+          <div className="card kpi-card" key={label}>
             <div className="kpi-label">{label}</div>
             <div className="kpi" style={{ fontSize: 32 }}>{n}</div>
           </div>
@@ -90,7 +90,7 @@ export default async function AdminHome({
                       CPF {p ? formatCpf(p.cpf) : "—"} · {date(l.created_at)}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", display: "flex", gap: 16, alignItems: "center" }}>
+                  <div className="list-acoes">
                     <div>
                       <div>
                         <strong>{brl(Number(l.amount))}</strong>{" "}

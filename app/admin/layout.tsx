@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
+import AdminTabs from "@/components/admin/AdminTabs";
 import { Logo } from "@/components/Header";
 import { requireAdmin } from "@/lib/account";
 
@@ -13,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="wrap">
           <Logo />
           <nav className="nav">
-            <span className="badge b-aprovado">Administrador</span>
+            <span className="badge b-aprovado admin-selo">Administrador</span>
             <Link href="/conta" className="btn btn-ghost">
               Ver como cliente
             </Link>
@@ -25,14 +26,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </nav>
         </div>
       </header>
-      <div className="wrap" style={{ padding: "32px 20px 64px" }}>
-        <nav className="nav admin-tabs" aria-label="Administração">
-          <Link href="/admin" className="btn btn-ghost">Pedidos de empréstimo</Link>
-          <Link href="/admin/contas" className="btn btn-ghost">Contas</Link>
-          <Link href="/admin/kyc" className="btn btn-ghost">Verificações</Link>
-          <Link href="/admin/usuarios" className="btn btn-ghost">Usuários cadastrados</Link>
-          <Link href="/admin/config" className="btn btn-ghost">Gateway / Taxa</Link>
-        </nav>
+      <div className="wrap admin-main">
+        <AdminTabs />
         {children}
       </div>
     </>
