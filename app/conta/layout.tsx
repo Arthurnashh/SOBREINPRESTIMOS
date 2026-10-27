@@ -18,9 +18,14 @@ export default async function ContaLayout({ children }: { children: React.ReactN
   // A verificação faz parte de abrir a conta. Enquanto não estiver aprovada,
   // o menu fica travado: só a própria verificação e o sair. Sem isso o cliente
   // entra num banco que não deixa fazer nada, sem entender por quê.
+  //
+  // O administrador é a exceção: ele é quem APROVA as verificações, então
+  // exigi-la dele é um ciclo fechado — ninguém aprova o admin, e ele ficaria
+  // preso fora do próprio painel. O banco segue a mesma regra: veja
+  // `kyc_pode_movimentar` em supabase/admin3.sql.
   const kyc = await getKyc(supabase).meuStatus();
   const status = kyc.ok ? kyc.data.status : "nao_iniciado";
-  const liberado = status === "aprovado" || status === "em_analise";
+  const liberado = ehAdmin || status === "aprovado" || status === "em_analise";
 
   if (!liberado) {
     return (
