@@ -25,6 +25,38 @@ no painel. Para um site dormente, vale o plano pago de US$25.
 
 ---
 
+## Duas armadilhas que já custaram tempo
+
+### 1. Arquivo grande não passa por Server Action
+
+O Next.js limita o corpo de Server Actions a **1 MB** por padrão. Foto tirada no
+celular tem 3–8 MB, então enviar o `File` para uma action faz o envio ficar
+pendurado — a tela mostra "Enviando…" para sempre, sem erro.
+
+Por isso o KYC envia **direto do navegador para o Supabase Storage**
+(`lib/kyc/enviar-direto.ts`) e manda ao servidor apenas o caminho do arquivo.
+O arquivo ainda é reduzido no navegador antes de subir (`lib/comprimir.ts`):
+1600px no maior lado e JPEG em 82% levam uma foto de 5 MB para ~300 KB.
+
+Se algum dia precisar enviar arquivo por action, o limite se ajusta em
+`next.config.ts`:
+
+```ts
+experimental: { serverActions: { bodySizeLimit: "10mb" } }
+```
+
+Mas prefira o caminho direto: o arquivo não passa pelo servidor da aplicação,
+gasta menos banda e não concorre com o limite de execução da Vercel.
+
+### 2. Meta viewport é obrigatória
+
+Sem `export const viewport` no `app/layout.tsx`, o celular assume uma página de
+desktop (~980px) e encolhe tudo. O site fica ilegível e os botões difíceis de
+tocar, mesmo com todo o CSS responsivo correto. Está declarada lá, com
+`viewportFit: "cover"` para aparelhos com notch.
+
+---
+
 ## Passo 1 — Criar o banco no Supabase (3 min)
 
 1. [supabase.com](https://supabase.com) → **Start your project** → entre com GitHub.
