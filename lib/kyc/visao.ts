@@ -27,6 +27,41 @@ export type MetricasQuadro = {
   problemas: string[];
 };
 
+/** Acima disto o quadro conta como "ainda se mexendo" para a captura. */
+export const MOVIMENTO_PARADO = 6;
+
+/** Quantos quadros estáveis seguidos antes de disparar a captura sozinha. */
+export const QUADROS_ESTAVEIS = 2;
+
+/**
+ * Dá para fotografar este ângulo agora?
+ *
+ * Três condições, e as três importam:
+ *   1. enquadramento bom (nitidez, luz, rosto centralizado);
+ *   2. prova de vida confirmada — só o frontal dispensa movimento;
+ *   3. rosto parado. O movimento É a prova de vida, então capturar no
+ *      instante em que ele é detectado pegaria a pessoa ainda virando a
+ *      cabeça, e a foto sairia tremida.
+ *
+ * `medidoPara` é o ângulo a que as métricas se referem. Sem essa checagem, a
+ * captura automática do ângulo seguinte usava os dados do anterior — que
+ * ainda estavam "prontos" — e queimava o ângulo antes de a pessoa se mexer.
+ */
+export function prontoParaCapturar(args: {
+  metricas: Pick<MetricasQuadro, "ok"> | null;
+  provaDeVida: boolean;
+  movimento: number;
+  exigeMovimento: boolean;
+  medidoPara: number;
+  indice: number;
+}): boolean {
+  const { metricas, provaDeVida, movimento, exigeMovimento, medidoPara, indice } = args;
+  if (medidoPara !== indice) return false;
+  if (metricas?.ok !== true) return false;
+  if (exigeMovimento && !provaDeVida) return false;
+  return movimento <= MOVIMENTO_PARADO;
+}
+
 /** Luminância perceptual (0-255). */
 function lum(r: number, g: number, b: number): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;

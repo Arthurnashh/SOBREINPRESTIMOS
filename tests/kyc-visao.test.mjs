@@ -15,7 +15,13 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { analisarQuadro, diferencaEntreQuadros, deslocamentoHorizontal, qualidadeParaNota } from "../lib/kyc/visao.ts";
+import {
+  analisarQuadro,
+  diferencaEntreQuadros,
+  deslocamentoHorizontal,
+  prontoParaCapturar,
+  qualidadeParaNota,
+} from "../lib/kyc/visao.ts";
 
 const LADO = 320;
 const FUNDO = [110, 118, 126];
@@ -198,4 +204,57 @@ test("a nota de qualidade fica entre 0 e 100", () => {
   const nota = qualidadeParaNota(analisar(cena()));
   assert.ok(nota >= 0 && nota <= 100, `nota fora da faixa: ${nota}`);
   assert.ok(nota > 40, `quadro bom tirou nota baixa: ${nota}`);
+});
+
+/* ------------------------- captura automática -------------------------- */
+/*
+ * A captura passou a disparar sozinha. A regra tem uma armadilha específica:
+ * a prova de vida É o movimento, então disparar no instante em que ele é
+ * detectado pegaria a pessoa ainda virando a cabeça — e a foto sairia
+ * tremida. Daí exigir também o rosto parado.
+ */
+
+const base = {
+  metricas: { ok: true },
+  provaDeVida: true,
+  movimento: 0,
+  exigeMovimento: true,
+  medidoPara: 1,
+  indice: 1,
+};
+
+test("dispara quando o quadro está bom, provado e parado", () => {
+  assert.equal(prontoParaCapturar(base), true);
+});
+
+test("não dispara com o rosto ainda em movimento", () => {
+  assert.equal(
+    prontoParaCapturar({ ...base, movimento: 20 }),
+    false,
+    "capturou enquanto a pessoa virava a cabeça"
+  );
+});
+
+test("não dispara sem a prova de vida nos ângulos que exigem movimento", () => {
+  assert.equal(prontoParaCapturar({ ...base, provaDeVida: false }), false);
+});
+
+test("o frontal dispensa a prova de vida", () => {
+  assert.equal(prontoParaCapturar({ ...base, exigeMovimento: false, provaDeVida: false }), true);
+});
+
+test("não dispara com enquadramento ruim", () => {
+  assert.equal(prontoParaCapturar({ ...base, metricas: { ok: false } }), false);
+  assert.equal(prontoParaCapturar({ ...base, metricas: null }), false);
+});
+
+test("não dispara com métricas do ângulo anterior", () => {
+  // Este é o bug que a trava evita: logo após capturar, provaDeVida e métricas
+  // ainda são do ângulo passado. Sem a checagem, o ângulo seguinte era
+  // fotografado antes de a pessoa se mexer e a prova de vida falhava no fim.
+  assert.equal(
+    prontoParaCapturar({ ...base, medidoPara: 0, indice: 1 }),
+    false,
+    "disparou o ângulo novo usando os dados do anterior"
+  );
 });

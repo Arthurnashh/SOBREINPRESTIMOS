@@ -6,7 +6,9 @@ import {
   analisarQuadro,
   deslocamentoHorizontal,
   diferencaEntreQuadros,
+  prontoParaCapturar,
   qualidadeParaNota,
+  QUADROS_ESTAVEIS,
   type MetricasQuadro,
 } from "@/lib/kyc/visao";
 import { IconeCadeado, IconeCartao, IconeEscudo, IconePerfil } from "../Icones";
@@ -18,6 +20,20 @@ type Props = {
 
 const LADO = 320;
 
+/**
+ * Captura automática.
+ *
+ * O enquadramento bom sozinho não basta para disparar: nos ângulos de virar a
+ * cabeça o rosto ainda está em movimento quando a prova de vida é confirmada,
+ * e a captura seria recusada por tremor (`movimento > 45`). Então esperamos o
+ * quadro ficar bom, a prova de vida confirmada E o movimento cair.
+ *
+ * São dois quadros estáveis seguidos, a 400 ms cada: ~800 ms entre "ficou
+ * pronto" e a foto. O contador na tela avisa antes para ninguém ser pego de
+ * surpresa; o botão continua funcionando para quem quiser forçar.
+ */
+const INTERVALO_MS = 400;
+
 export default function CapturaFacial({ onFace, onConcluir }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,6 +41,20 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
   const frontalRef = useRef<ImageData | null>(null);
   /** Movimento atual, fora do estado, para não recriar `analisar` a cada quadro. */
   const movimentoRef = useRef(0);
+  /** Quantos quadros seguidos estão prontos e parados. */
+  const estaveisRef = useRef(0);
+  /** Trava para o automático e o botão nunca capturarem o mesmo ângulo duas vezes. */
+  const disparandoRef = useRef(false);
+  /**
+   * Índice para o qual `metricas`/`provaDeVida`/`movimento` já foram medidos.
+   *
+   * Sem isto o automático disparava o ângulo SEGUINTE com os dados do
+   * anterior: logo após capturar, `provaDeVida` ainda era true e
+   * `metricas.ok` ainda era do quadro antigo, então o novo ângulo era
+   * fotografado antes de a pessoa se mexer — e a prova de vida falhava no
+   * fim. O automático só age quando o analisador já rodou para o índice atual.
+   */
+  const medidoRef = useRef(-1);
 
   const [erro, setErro] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
@@ -38,6 +68,8 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
   const [provas, setProvas] = useState<boolean[]>([]);
   const [provaDeVida, setProvaDeVida] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  /** Quadros estáveis já acumulados — alimenta o contador da tela. */
+  const [estaveis, setEstaveis] = useState(0);
 
   const atual = FACE_SHOTS[indice];
   const ultimo = indice === FACE_SHOTS.length - 1;
@@ -99,6 +131,9 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
 
     const m = analisarQuadro(ctx, LADO, LADO);
     setMetricas(m);
+    // Marca que este quadro já corresponde ao ângulo atual — o automático
+    // depende disto para não disparar com dados do ângulo anterior.
+    medidoRef.current = indice;
 
     const quadro = ctx.getImageData(0, 0, LADO, LADO);
     const anterior = anteriorRef.current;
@@ -144,19 +179,26 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
     // guarda o quadro para comparar com o próximo — é a base do movimento
     anteriorRef.current = quadro;
     // `movimento` sai das dependências de propósito: é lido via ref.
-  }, [atual.angle]);
+  }, [atual.angle, indice]);
 
   useEffect(() => {
     if (!pronto) return;
-    const id = window.setInterval(analisar, 400);
+    const id = window.setInterval(analisar, INTERVALO_MS);
     return () => window.clearInterval(id);
   }, [pronto, analisar]);
+
   useEffect(() => {
     setProvaDeVida(false);
+    estaveisRef.current = 0;
+    setEstaveis(0);
   }, [indice]);
 
   /* ------------------------------ captura ----------------------------- */
-  const capturar = async () => {
+  const capturar = useCallback(async () => {
+    // O automático e o botão podem coincidir; sem a trava o mesmo ângulo
+    // subiria duas vezes e o segundo envio sobrescreveria o primeiro.
+    if (disparandoRef.current) return;
+
     const v = videoRef.current;
     const c = canvasRef.current;
     if (!v || !c) {
@@ -185,8 +227,11 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
       return;
     }
 
+    disparandoRef.current = true;
     setCapturando(true);
     setErro(null);
+    estaveisRef.current = 0;
+    setEstaveis(0);
 
     // guarda o frontal como referência da prova de vida
     if (atual.angle === "frontal") {
@@ -201,6 +246,7 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
     if (!blob) {
       setErro("Não consegui capturar a foto. Tente novamente.");
       setCapturando(false);
+      disparandoRef.current = false;
       return;
     }
 
@@ -208,6 +254,7 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
     if (!r.ok) {
       setErro(r.error ?? "Falha ao enviar a foto.");
       setCapturando(false);
+      disparandoRef.current = false;
       return;
     }
 
@@ -238,6 +285,7 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
           "Não confirmei o movimento em todos os ângulos. Refaça virando a cabeça, sorrindo e aproximando quando for pedido."
         );
         setSalvando(false);
+        disparandoRef.current = false;
         return;
       }
 
@@ -250,28 +298,88 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
     } else {
       setIndice((i) => i + 1);
     }
-  };
+    disparandoRef.current = false;
+  }, [atual.angle, metricas, movimento, notas, provas, provaDeVida, ultimo, onFace, onConcluir]);
+
+  /* --------------------------- captura automática ---------------------- */
+  /*
+   * Conta quadros seguidos em que dá para capturar: enquadramento bom, prova
+   * de vida confirmada (quando o ângulo exige) e rosto parado. Ao atingir
+   * QUADROS_ESTAVEIS, dispara sozinho.
+   *
+   * A espera existe porque o movimento é justamente a prova de vida: capturar
+   * no instante em que ele é detectado pegaria a pessoa ainda virando, e a
+   * foto seria recusada por tremor.
+   */
+  useEffect(() => {
+    if (!pronto || capturando || salvando) return;
+
+    // Só depois de o analisador ter rodado para ESTE ângulo. Sem isto o
+    // ângulo seguinte era fotografado com os dados do anterior.
+    if (medidoRef.current !== indice) return;
+
+    const exigiaMovimento = atual.angle !== "frontal";
+    const podeCapturar = prontoParaCapturar({
+      metricas,
+      provaDeVida,
+      movimento,
+      exigeMovimento: exigiaMovimento,
+      medidoPara: medidoRef.current,
+      indice,
+    });
+
+    if (!podeCapturar) {
+      if (estaveisRef.current !== 0) {
+        estaveisRef.current = 0;
+        setEstaveis(0);
+      }
+      return;
+    }
+
+    if (estaveisRef.current >= QUADROS_ESTAVEIS) return;
+
+    estaveisRef.current += 1;
+    setEstaveis(estaveisRef.current);
+
+    if (estaveisRef.current >= QUADROS_ESTAVEIS) void capturar();
+  }, [pronto, capturando, salvando, metricas, provaDeVida, movimento, atual.angle, indice, capturar]);
 
   /* ------------------------------- render ----------------------------- */
   const tom = metricas?.ok ? "ok" : "ruim";
+
+  const exigiaMovimento = atual.angle !== "frontal";
+  const podeCapturar = prontoParaCapturar({
+    metricas,
+    provaDeVida,
+    movimento,
+    exigeMovimento: exigiaMovimento,
+    medidoPara: medidoRef.current,
+    indice,
+  });
+  /** Contador regressivo visível: quantos quadros faltam para disparar. */
+  const faltam = podeCapturar ? Math.max(QUADROS_ESTAVEIS - estaveis, 0) : 0;
+  const vaiDisparar = podeCapturar && faltam > 0;
 
   /**
    * O que fazer AGORA, neste ângulo, considerando o que o quadro já mostra.
    * É o que faltava: com o enquadramento bom a tela não dizia mais nada.
    */
   const acaoAgora = (() => {
-    if (atual.angle === "frontal") return "toque em Capturar frontal";
+    if (vaiDisparar) return "capturando sozinho, segure assim";
+    if (atual.angle === "frontal") {
+      return metricas?.ok ? "capturando…" : "centralize o rosto";
+    }
     if (atual.angle === "direita" || atual.angle === "esquerda") {
-      if (provaDeVida) return "movimento confirmado, toque em Capturar";
+      if (provaDeVida) return "movimento confirmado, agora fique parado";
       return `vire devagar para a ${atual.angle === "direita" ? "direita" : "esquerda"}`;
     }
     if (atual.angle === "sorriso") {
-      return provaDeVida ? "sorriso confirmado, toque em Capturar" : "sorria de leve e segure";
+      return provaDeVida ? "sorriso confirmado, segure" : "sorria de leve e segure";
     }
     if (atual.angle === "perto") {
-      return provaDeVida ? "pronto, toque em Capturar" : "aproxime o rosto da câmera";
+      return provaDeVida ? "pronto, segure assim" : "aproxime o rosto da câmera";
     }
-    return "toque em Capturar";
+    return "segure o enquadramento";
   })();
 
   /** Objetivo da prova de vida neste ângulo. */
@@ -297,6 +405,12 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
         <video ref={videoRef} playsInline muted className="kyc-video" />
         <canvas ref={canvasRef} style={{ display: "none" }} />
         <div className={`kyc-mascara ${tom}`} aria-hidden />
+        {vaiDisparar && (
+          <div className="kyc-contador" role="status" aria-live="polite">
+            <span className="kyc-contador-aro" aria-hidden />
+            {faltam === 1 ? "Capturando…" : "Não se mexa…"}
+          </div>
+        )}
         {metricas && (
           <div className={`kyc-dica ${tom}`}>
             {/* Antes, quando o enquadramento ficava bom, a dica virava só
@@ -356,16 +470,23 @@ export default function CapturaFacial({ onFace, onConcluir }: Props) {
         disabled={!pronto || capturando || salvando}
       >
         <IconePerfil size={18} />
-        {salvando ? "Concluindo…" : capturando ? "Capturando…" : ultimo ? "Concluir biometria" : `Capturar ${atual.label.toLowerCase()}`}
+        {salvando
+          ? "Concluindo…"
+          : capturando
+            ? "Capturando…"
+            : vaiDisparar
+              ? "Capturando sozinho…"
+              : ultimo
+                ? "Concluir biometria agora"
+                : `Capturar ${atual.label.toLowerCase()} agora`}
       </button>
 
-      {/* O botão fica sempre clicável: se o quadro não estiver bom, dizemos o
-          que ajustar em vez de deixar um botão morto sem explicação. */}
-      {pronto && !capturando && !salvando && metricas && !metricas.ok && (
-        <p className="fine kyc-aviso-clique">
-          Dá para clicar assim que ajustar: {metricas.problemas[0]}
-        </p>
-      )}
+      {/* A captura é automática: o botão é atalho para quem não quer esperar. */}
+      <p className="fine kyc-aviso-clique">
+        {metricas && !metricas.ok
+          ? `A foto sai sozinha assim que ajustar: ${metricas.problemas[0]}`
+          : "A foto é tirada sozinha quando o enquadramento fica verde. O botão é só um atalho."}
+      </p>
 
       <p className="fine kyc-privacidade">
         <IconeCadeado size={14} /> As fotos ficam guardadas em área privada, visíveis só para você e

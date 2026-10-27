@@ -249,6 +249,41 @@
 .kyc-dica.ok { background: rgba(18, 58, 102, 0.9); }
 .kyc-dica.ruim { background: rgba(146, 64, 14, 0.92); }
 
+/* Aviso do disparo automático: aparece nos ~800 ms entre "ficou pronto" e a
+   foto, para ninguém ser pego de surpresa nem se mexer achando que falhou. */
+.kyc-contador {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1d6b3a;
+  color: #fff;
+  font: 700 12.5px var(--body);
+  padding: 7px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .6);
+}
+.kyc-contador-aro {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, .45);
+  border-top-color: #fff;
+  animation: kyc-girar .7s linear infinite;
+}
+
+@keyframes kyc-girar {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kyc-contador-aro { animation: none; }
+}
+
 .kyc-instrucao {
   text-align: center;
   color: var(--brand-deep, #0a2544);
