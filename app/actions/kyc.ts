@@ -76,6 +76,29 @@ export async function salvarProvaTipo(tipo: KycProofType): Promise<{ ok: boolean
 
 /* ------------------------------ arquivos ----------------------------- */
 
+/**
+ * Registra no banco o caminho de um arquivo JÁ enviado ao Storage.
+ *
+ * O envio em si acontece no navegador (lib/kyc/enviar-direto.ts), porque o
+ * Next.js limita o corpo de Server Actions a 1 MB e foto de celular tem 3–8 MB.
+ * Aqui só gravamos o caminho, que é uma operação leve.
+ */
+export async function registrarArquivoKyc(
+  slot: KycSlot,
+  path: string,
+  detalhe?: string
+): Promise<{ ok: boolean; error?: string; detalhe?: string }> {
+  const { kyc } = await ctx();
+
+  if (!path) return { ok: false, error: "Caminho do arquivo ausente." };
+
+  const r = await kyc.registrarArquivo(slot, path);
+  if (!r.ok) return { ok: false, error: r.error };
+
+  revalidatePath("/conta/verificacao");
+  return { ok: true, detalhe };
+}
+
 export async function enviarArquivoKyc(
   slot: KycSlot,
   arquivo: File

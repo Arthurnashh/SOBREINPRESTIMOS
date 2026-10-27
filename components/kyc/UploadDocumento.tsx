@@ -13,7 +13,10 @@ type Props = {
   jaEnviado?: boolean;
   pathAtual?: string | null;
   onUrl?: (path: string) => Promise<string | null>;
-  onEnviar: (slot: SlotUpload, arquivo: File) => Promise<{ ok: boolean; error?: string }>;
+  onEnviar: (
+    slot: SlotUpload,
+    arquivo: File
+  ) => Promise<{ ok: boolean; error?: string; detalhe?: string }>;
   /** escolha do tipo de comprovante */
   provaTipo?: KycProofType;
   onProvaTipo?: (t: KycProofType) => void;
@@ -42,6 +45,7 @@ export default function UploadDocumento({
   const [nome, setNome] = useState<string | null>(null);
   const [previa, setPrevia] = useState<string | null>(null);
   const [abrindo, setAbrindo] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const escolher = () => inputRef.current?.click();
 
@@ -58,8 +62,33 @@ export default function UploadDocumento({
     if (!arquivo) return;
     setErro(null);
     setEnviando(true);
+    setAviso(null);
 
-    const r = await onEnviar(slot, arquivo);
+    /*
+     * Rede de segurança: se o envio travar (rede caindo, servidor sem
+     * responder), o botão não pode ficar em "Enviando…" para sempre. Antes
+     * disso acontecer, o arquivo atravessava a Server Action e estourava o
+     * limite de 1 MB do Next — a barra girava indefinidamente.
+     */
+    let expirou = false;
+    const alarme = setTimeout(() => {
+      expirou = true;
+      setEnviando(false);
+      setErro(
+        "O envio está demorando demais. Verifique sua conexão e tente novamente."
+      );
+    }, 45000);
+
+    let r: { ok: boolean; error?: string; detalhe?: string };
+    try {
+      r = await onEnviar(slot, arquivo);
+    } catch {
+      r = { ok: false, error: "Falha inesperada no envio. Tente novamente." };
+    } finally {
+      clearTimeout(alarme);
+    }
+
+    if (expirou) return;
     setEnviando(false);
 
     if (!r.ok) {
@@ -69,6 +98,7 @@ export default function UploadDocumento({
 
     setFeito(true);
     setNome(arquivo.name);
+    if (r.detalhe) setAviso(r.detalhe);
     // prévia só para imagem
     if (arquivo.type.startsWith("image/")) {
       const url = URL.createObjectURL(arquivo);
@@ -166,6 +196,7 @@ export default function UploadDocumento({
       </div>
 
       {nome && <p className="fine">Arquivo: {nome}</p>}
+      {aviso && <p className="fine">{aviso}</p>}
       {erro && (
         <div className="alert alert-err" role="alert">
           {erro}

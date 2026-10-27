@@ -27,7 +27,12 @@ export type KycSlot =
   | "face_sorriso"
   | "face_perto";
 
-const SLOT_BY_ANGLE: Record<FaceAngle, KycSlot> = {
+/**
+ * Slot de cada ângulo do rosto. Exportado porque o envio passou a ser feito
+ * direto do navegador (lib/kyc/enviar-direto.ts), que precisa do mesmo mapa
+ * sem duplicar a definição aqui.
+ */
+export const SLOT_BY_ANGLE: Record<FaceAngle, KycSlot> = {
   frontal: "face_frontal",
   direita: "face_direita",
   esquerda: "face_esquerda",
@@ -142,8 +147,27 @@ export class KycService {
   }
 
   /**
+   * Registra o caminho de um arquivo que já está no bucket.
+   *
+   * Separado de `enviarArquivo` porque o upload passou a ser feito direto do
+   * navegador — aqui só gravamos a referência no banco.
+   */
+  async registrarArquivo(slot: KycSlot, path: string): Promise<Result> {
+    if (!path) return { ok: false, error: "Caminho do arquivo ausente." };
+    const { error } = await this.supabase.rpc("kyc_registrar_arquivo", {
+      p_slot: slot,
+      p_path: path,
+    });
+    if (error) return { ok: false, error: mensagemKyc(error.message) };
+    return { ok: true, data: undefined };
+  }
+
+  /**
    * Envia um arquivo ao bucket privado e registra o caminho.
    * O caminho começa com o id do dono, exigência da policy do Storage.
+   *
+   * Mantido para uso no servidor. O navegador usa `enviarArquivoDireto`, que
+   * não passa pelo limite de 1 MB das Server Actions.
    */
   async enviarArquivo(
     slot: KycSlot,

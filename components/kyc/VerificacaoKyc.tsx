@@ -7,12 +7,13 @@ import {
   salvarEnderecoKyc,
   salvarDocumentoKyc,
   salvarProvaTipo,
-  enviarArquivoKyc,
-  enviarFaceKyc,
+  registrarArquivoKyc,
   registrarBiometriaKyc,
   enviarKycParaAnalise,
   urlArquivoKyc,
 } from "@/app/actions/kyc";
+import { enviarArquivoDireto } from "@/lib/kyc/enviar-direto";
+import { SLOT_BY_ANGLE } from "@/lib/kyc/service";
 import {
   FACE_SHOTS,
   KYC_STATUS_LABEL,
@@ -65,10 +66,26 @@ export default function VerificacaoKyc({
     });
   };
 
+  /*
+   * O arquivo vai DIRETO do navegador para o Storage, e só o caminho resultante
+   * é registrado no banco por uma Server Action.
+   *
+   * Antes o File inteiro atravessava a Server Action, e o Next.js limita esse
+   * corpo a 1 MB — foto de celular tem 3–8 MB, então o envio ficava pendurado
+   * em "Enviando…" para sempre. O arquivo agora também é comprimido no
+   * navegador antes de subir (ver lib/comprimir.ts).
+   */
   const registrarSlot = async (slot: SlotUpload, arquivo: File) => {
-    const r = await enviarArquivoKyc(slot as KycSlot, arquivo);
-    if (r.ok) await recarregar();
-    return r;
+    const envio = await enviarArquivoDireto(slot as KycSlot, arquivo);
+    if (!envio.ok || !envio.path) {
+      return { ok: false, error: envio.error ?? "Falha ao enviar." };
+    }
+
+    const reg = await registrarArquivoKyc(slot as KycSlot, envio.path, envio.detalhe);
+    if (!reg.ok) return reg;
+
+    await recarregar();
+    return { ok: true, detalhe: envio.detalhe };
   };
 
   /*
@@ -85,8 +102,13 @@ export default function VerificacaoKyc({
 
   const registrarFace = async (angle: FaceAngle, blob: Blob) => {
     const arquivo = new File([blob], `${angle}.jpg`, { type: "image/jpeg" });
-    const r = await enviarFaceKyc(angle, arquivo);
-    return r;
+    // Mesmo caminho do documento: direto para o Storage, sem passar pela
+    // Server Action (que corta em 1 MB).
+    const envio = await enviarArquivoDireto(SLOT_BY_ANGLE[angle], arquivo);
+    if (!envio.ok || !envio.path) {
+      return { ok: false, error: envio.error ?? "Falha ao enviar a foto." };
+    }
+    return await registrarArquivoKyc(SLOT_BY_ANGLE[angle], envio.path, envio.detalhe);
   };
 
   const concluirBiometria = (dados: {
