@@ -149,6 +149,19 @@ export async function enviarKycParaAnalise(): Promise<{ ok: boolean; error?: str
   const r = await kyc.enviarParaAnalise();
   if (!r.ok) return { ok: false, error: r.error };
 
+  // Triagem automática, depois de o envio ter sido aceito.
+  //
+  // Falha aqui NÃO desfaz o envio: a verificação já está na fila e o admin
+  // consegue analisar manualmente. O `catch` existe porque a triagem faz
+  // chamada de rede, e uma falha dela não pode aparecer como erro para o
+  // cliente que acabou de enviar os documentos.
+  try {
+    const { triarKyc } = await import("./kyc-ia");
+    await triarKyc();
+  } catch {
+    // silêncio proposital: o caso fica na fila manual
+  }
+
   revalidatePath("/conta/verificacao");
   revalidatePath("/conta/banco");
   revalidatePath("/conta");

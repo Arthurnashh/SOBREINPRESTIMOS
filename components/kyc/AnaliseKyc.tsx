@@ -6,6 +6,7 @@ import { indiceValido, montarGaleria } from "@/lib/kyc/galeria";
 import { PROOF_LABEL, KYC_STATUS_LABEL, type KycFilaItem } from "@/lib/kyc";
 import { IconeEscudo, IconeCadeado, IconeCadeadoAberto } from "../Icones";
 import ModalFoto from "../admin/ModalFoto";
+import PainelIa from "./PainelIa";
 
 const ROTULO_FOTO: Record<string, string> = {
   doc_frente: "Documento — frente",
@@ -53,6 +54,8 @@ function ItemAnalise({
   const [carregando, setCarregando] = useState(false);
   const [pendente, iniciar] = useTransition();
   const [fotoAberta, setFotoAberta] = useState<number | null>(null);
+  const [triagem, setTriagem] = useState<Record<string, unknown> | null>(null);
+  const [iaLigada, setIaLigada] = useState(false);
 
   const galeria = montarGaleria(ROTULO_FOTO, fotos);
 
@@ -71,9 +74,13 @@ function ItemAnalise({
     const d = (await r.json()) as {
       detalhe: Record<string, unknown>;
       urls: Record<string, string | null>;
+      triagem?: Record<string, unknown> | null;
+      iaDisponivel?: boolean;
     };
     setDetalhe(d.detalhe);
     setFotos(d.urls);
+    setTriagem(d.triagem ?? null);
+    setIaLigada(Boolean(d.iaDisponivel));
     setCarregando(false);
   };
 
@@ -136,6 +143,10 @@ function ItemAnalise({
             <div className="alert alert-ok" role="status">
               {aviso}
             </div>
+          )}
+
+          {detalhe && (
+            <PainelIa userId={item.userId} triagem={triagem} disponivel={iaLigada} />
           )}
 
           {detalhe && (

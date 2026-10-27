@@ -1000,3 +1000,64 @@
   .modal-foto-pdf { height: 58vh; }
   .modal-foto-seta { width: 36px; height: 36px; font-size: 22px; }
 }
+
+/* --------------------- triagem automática (IA) ---------------------- */
+/* O painel fica acima do resumo do KYC, para o admin ver primeiro o que a
+   máquina concluiu e só depois conferir os dados por conta própria. */
+.ia-bloco { margin-bottom: 18px; }
+
+.ia-estado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--kyc-line);
+  background: #f4f7fb;
+}
+.ia-estado strong { display: block; font-size: 15px; }
+.ia-estado .fine { display: block; margin-top: 2px; }
+.ia-estado.ok { background: #eafaf1; border-color: #b7e4c7; }
+.ia-estado.ok strong { color: #14532d; }
+.ia-estado.alerta { background: #fff8e6; border-color: #f3d99b; }
+.ia-estado.alerta strong { color: #7c4a03; }
+.ia-estado.erro { background: #fdecec; border-color: #f5b5b5; }
+.ia-estado.erro strong { color: #8a1c1c; }
+
+.ia-sub {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--kyc-muted, #5b6b80);
+  margin-bottom: -8px;
+}
+
+.ia-lista {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: #24384f;
+}
+.ia-lista li {
+  position: relative;
+  padding-left: 16px;
+}
+.ia-lista li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #9bb1c9;
+}
+.ia-lista.alerta li::before { background: #e0a106; }
+
+.ia-aviso {
+  border-top: 1px solid var(--kyc-line);
+  padding-top: 12px;
+}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/account";
 import { createClient } from "@/lib/supabase/server";
 import { getKyc } from "@/lib/kyc";
+import { iaConfigurada } from "@/lib/kyc/ia";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,17 @@ export async function GET(
     urls[slot] = path ? await kyc.urlAssinada(path, 600) : null;
   }
 
+  // Resumo da triagem automática, para o painel da IA na tela do admin.
+  // O admin lê qualquer linha por RLS; a ausência de triagem é normal (caso
+  // ainda não analisado ou análise não configurada) e não é erro.
+  const { data: sub } = await supabase
+    .from("kyc_submissions")
+    .select("triagem_ia")
+    .eq("user_id", userId)
+    .maybeSingle<{ triagem_ia: Record<string, unknown> | null }>();
+
   return NextResponse.json(
-    { detalhe: r.data, urls },
+    { detalhe: r.data, urls, triagem: sub?.triagem_ia ?? null, iaDisponivel: iaConfigurada() },
     { headers: { "cache-control": "no-store, max-age=0" } }
   );
 }
