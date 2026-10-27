@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { brl, pct } from "@/lib/format";
+import TaxaConfirmada from "./TaxaConfirmada";
 import {
   consultarPagamentoTaxa,
   gerarCobrancaTaxa,
@@ -121,21 +122,7 @@ export default function TaxaCobranca({
   };
 
   if (pago) {
-    return (
-      <section className="bank-secao taxa-bloco taxa-pago" aria-live="polite">
-        <p className="eyebrow">Pagamento confirmado</p>
-        <h2 style={{ marginTop: 8 }}>Conta liberada</h2>
-        <p className="muted" style={{ marginTop: 10 }}>
-          Recebemos o pagamento da taxa de confiança de {brl(taxa)}. O valor do empréstimo já está
-          disponível na sua conta e a taxa foi abatida na primeira parcela.
-        </p>
-        <div className="modal-acoes" style={{ marginTop: 14 }}>
-          <button type="button" className="btn btn-primary" onClick={() => router.refresh()}>
-            Continuar
-          </button>
-        </div>
-      </section>
-    );
+    return <TaxaConfirmada taxa={taxa} parcela={parcela} />;
   }
 
   return (

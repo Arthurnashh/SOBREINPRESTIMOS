@@ -384,6 +384,8 @@
 .taxa-bloco .pix-qr { max-width: 240px; }
 .taxa-pago { border-color: #cfe6d5; background: #f4fbf6; }
 .taxa-pago h2 { color: #1d6b3a; }
+/* Fora do bank-shell (topo da conta) o card precisa da própria margem. */
+.acc-shell > main > .taxa-pago { margin-bottom: 18px; }
 
 /* Faixa do topo da conta: o saldo do empréstimo aparece creditado, mas
    bloqueado no banco. Sem este aviso o cliente veria o valor, tentaria usar

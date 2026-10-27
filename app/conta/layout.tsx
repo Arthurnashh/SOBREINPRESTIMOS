@@ -2,7 +2,8 @@ import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { Logo } from "@/components/Header";
 import SideNav from "@/components/conta/SideNav";
-import { getTaxaPendente, requireSession } from "@/lib/account";
+import TaxaConfirmada from "@/components/TaxaConfirmada";
+import { getTaxaConfirmada, getTaxaPendente, requireSession } from "@/lib/account";
 import { LOAN } from "@/lib/config";
 import { getKyc } from "@/lib/kyc";
 
@@ -35,6 +36,18 @@ export default async function ContaLayout({ children }: { children: React.ReactN
    * Ou seja: ver o saldo não é poder gastá-lo.
    */
   const taxaPendente = await getTaxaPendente(supabase, LOAN.taxaAdesaoPct);
+
+  /*
+   * Confirmação da taxa paga.
+   *
+   * Cobre quem pagou o PIX no app do banco e fechou a página: o webhook já
+   * liberou o saldo, mas a tela de "Conta liberada" só existia para quem
+   * estava olhando o QR. Aqui ela reaparece na volta, por até 24 h.
+   *
+   * Só faz sentido quando não há outra taxa em aberto — nesse caso o cliente
+   * precisa ver a cobrança, não a comemoração da anterior.
+   */
+  const taxaConfirmada = taxaPendente ? null : await getTaxaConfirmada(supabase);
 
   // A verificação faz parte de abrir a conta. Enquanto não estiver aprovada,
   // o menu fica travado: só a própria verificação e o sair. Sem isso o cliente
@@ -95,6 +108,9 @@ export default async function ContaLayout({ children }: { children: React.ReactN
                 mas bloqueado até o pagamento. Toque para pagar na Área PIX.
               </span>
             </Link>
+          )}
+          {taxaConfirmada && (
+            <TaxaConfirmada taxa={taxaConfirmada.taxa} parcela={taxaConfirmada.parcela} />
           )}
           {children}
         </main>

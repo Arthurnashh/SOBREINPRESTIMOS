@@ -94,6 +94,22 @@ export type TaxaPendente = {
   } | null;
 };
 
+/** Taxa paga recentemente e ainda não confirmada ao cliente na interface. */
+export type TaxaConfirmada = {
+  taxa: number;
+  parcela: number;
+};
+
+/**
+ * Janela em que a confirmação continua sendo mostrada ao cliente.
+ *
+ * Cobre quem paga o PIX no app do banco e fecha a página: o webhook libera o
+ * saldo, mas a tela de "Conta liberada" só existia para quem estava olhando.
+ * Sem esta janela, o cliente volta, a cobrança sumiu e ninguém explicou nada.
+ * Passado o prazo, insistir na mensagem vira ruído em toda visita.
+ */
+const CONFIRMACAO_HORAS = 24;
+
 /**
  * Taxa de confiança em aberto do cliente, pronta para os componentes de UI.
  *
@@ -130,6 +146,42 @@ export const getTaxaPendente = cache(
               providerChargeId: null,
             }
           : null,
+      };
+    } catch {
+      return null;
+    }
+  }
+);
+
+/**
+ * Taxa paga nas últimas 24 h, para confirmar o pagamento a quem não estava na
+ * tela quando o webhook confirmou.
+ *
+ * A verdade vem de `loan_requests`: `loan_taxa_pagar` grava
+ * `taxa_adesao_status = 'aplicada'` e `taxa_adesao_ciente_em`. Só as colunas
+ * do próprio usuário são lidas, e a RLS de `loan_requests` já restringe ao dono.
+ */
+export const getTaxaConfirmada = cache(
+  async (supabase: Awaited<ReturnType<typeof createClient>>): Promise<TaxaConfirmada | null> => {
+    try {
+      const desde = new Date(Date.now() - CONFIRMACAO_HORAS * 3600 * 1000).toISOString();
+      const { data } = await supabase
+        .from("loan_requests")
+        .select("taxa_adesao, installment_value, taxa_adesao_ciente_em")
+        .eq("taxa_adesao_status", "aplicada")
+        .gte("taxa_adesao_ciente_em", desde)
+        .order("taxa_adesao_ciente_em", { ascending: false })
+        .limit(1)
+        .maybeSingle<{
+          taxa_adesao: number | string | null;
+          installment_value: number | string | null;
+          taxa_adesao_ciente_em: string | null;
+        }>();
+
+      if (!data) return null;
+      return {
+        taxa: Number(data.taxa_adesao ?? 0),
+        parcela: Number(data.installment_value ?? 0),
       };
     } catch {
       return null;
