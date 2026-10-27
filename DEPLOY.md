@@ -63,8 +63,14 @@ no painel. Para um site dormente, vale o plano pago de US$25.
    ficha completa (dados, KYC com as 9 fotos, saldo, extrato, cartão, PIX,
    limites, empréstimos), ajuste de saldo e bloqueio de conta/cartão, com
    trilha de auditoria
+7. `supabase/admin3.sql` — **admin não faz verificação**: `kyc_pode_movimentar`
+   passa a isentar administrador
+8. `supabase/loan3.sql` — **faixa do empréstimo** (R$ 500 a R$ 20.000) e as
+   colunas de declaração de seguro/garantia
+9. `supabase/loan4.sql` — **`loan_request()`**: criação do pedido por função.
+   Sem ela o cliente não consegue pedir empréstimo (ver nota abaixo)
 
-Os seis são idempotentes (`if not exists` / `drop policy if exists` /
+Os nove são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
@@ -79,6 +85,15 @@ Os seis são idempotentes (`if not exists` / `drop policy if exists` /
 > `admin_auditoria` — por isso vem depois de todos. Ele **não** mexe em
 > `bank_move`: o ajuste de saldo do admin é feito por `admin_ajustar_saldo`,
 > que insere o lançamento no extrato e atualiza o saldo na mesma transação.
+>
+> `admin3.sql` redefine `kyc_pode_movimentar`, que é usada por `bank_move`,
+> `bank_schedule`, `bank_run_schedules` e pela policy de criar pedido. Rodar
+> depois de `kyc.sql`, senão a isenção do admin se perde.
+>
+> `loan4.sql` é obrigatório para o empréstimo funcionar: `authenticated` **não
+> tem INSERT** em nenhuma tabela deste sistema — toda escrita passa por função
+> `SECURITY DEFINER`. O app pedia empréstimo com `.insert()` direto, o que
+> sempre resultava em "permission denied for table loan_requests".
 
 ### A conta bancária
 

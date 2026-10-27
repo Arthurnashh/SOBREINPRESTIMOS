@@ -17,6 +17,7 @@ const env = Object.fromEntries(
 );
 const U = env.NEXT_PUBLIC_SUPABASE_URL, ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+const SITE = "https://site-pearl-nine-93.vercel.app";
 const HS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" };
 
 let p = 0, f = 0;
@@ -201,17 +202,31 @@ const REF = new URL(U).host.split(".")[0];
 const cookie = `sb-${REF}-auth-token=${encodeURIComponent(JSON.stringify({
   access_token: adm.access_token, token_type: "bearer", expires_in: adm.expires_in,
   expires_at: adm.expires_at, refresh_token: adm.refresh_token, user: adm.user }))}`;
-const html = await (await fetch(`https://site-pearl-nine-93.vercel.app/admin/pedido/${alvo}`, { headers: { cookie } })).text();
+
+/* No pedido JÁ LIBERADO a tela mostra "já foi finalizado" e não tem botões —
+   isso é o certo. Para checar os botões, usamos um pedido que ainda está em
+   análise. */
+await fetch(`${U}/rest/v1/loan_requests?user_id=eq.${uid}`, { method: "DELETE", headers: HS });
+const emAnalise = await pedir(3000, 12, "imovel");
+ok("criei um pedido em análise para ver a tela", emAnalise.ok, emAnalise.erro.slice(0, 120));
+
+const html = await (await fetch(`${SITE}/admin/pedido/${emAnalise.data.id}`, { headers: { cookie } })).text();
 ok("a página do pedido mostra a seção de garantias", /Garantias declaradas/.test(html));
-ok("mostra a garantia marcada pelo cliente", /Tenho ve\u00edculo em meu nome/.test(html));
-// O React insere comentários entre nós de texto, então comparamos sem tags.
+ok("mostra a garantia marcada pelo cliente", /Tenho im\u00f3vel pr\u00f3prio/.test(html));
+
+/* O React insere comentários entre nós de texto, então comparamos sem tags. */
 const texto = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 ok("a página tem o botão de aprovar", /Aprovar com estas condi/.test(texto));
 ok("a página tem o botão de recusar", /Recusar/.test(texto));
-ok("a taxa mostrada não tem lixo de ponto flutuante", !/3,98999/.test(texto), (texto.match(/value="([\d.,]+)"/) ?? [])[1]);
+ok("a taxa mostrada não tem lixo de ponto flutuante", !/,\d{5,}/.test(texto), (texto.match(/value="([\d.,]+)"/) ?? [])[1]);
+
+/* No pedido finalizado, os botões NÃO devem aparecer. */
+const htmlFinal = await (await fetch(`${SITE}/admin/pedido/${alvo}`, { headers: { cookie } })).text();
+const textoFinal = htmlFinal.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+ok("pedido liberado não oferece aprovar de novo", !/Aprovar com estas condi/.test(textoFinal));
 
 /* A garantia também precisa aparecer no extrato de pedidos do painel. */
-const lista = await (await fetch(`https://site-pearl-nine-93.vercel.app/admin`, { headers: { cookie } })).text();
+const lista = await (await fetch(`${SITE}/admin`, { headers: { cookie } })).text();
 ok("a lista de pedidos do admin abre", /Pedidos/.test(lista));
 
 /* ------------------------------ limpeza ------------------------------ */
