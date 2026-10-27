@@ -57,13 +57,17 @@ const TOKEN = sessao.access_token;
 // Movimentar exige identidade aprovada desde o KYC. Aprova o titular que
 // esta suíte realmente usa — não "o primeiro perfil", que passaria a apontar
 // para outro usuário assim que houver mais de uma conta.
+// `uid` fica no escopo do módulo: outras checagens (ex.: a do cartão) precisam
+// filtrar por ele, porque há mais de uma conta no banco e `limit=1` sem filtro
+// devolve o registro de outra pessoa.
+let uid = null;
 {
   const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
   const HS = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` };
   const eu = await fetch(`${URL_BASE}/auth/v1/user`, {
     headers: { apikey: ANON, Authorization: `Bearer ${TOKEN}` },
   }).then((r) => (r.ok ? r.json() : null));
-  const uid = eu?.id;
+  uid = eu?.id ?? null;
   if (uid) {
     await fetch(`${URL_BASE}/rest/v1/kyc_submissions?user_id=eq.${uid}`, {
       method: "PATCH",
@@ -283,7 +287,10 @@ ok("UF inexistente recusada", !ufRuim.ok, ufRuim.erro);
 console.log("\n8) Cartão: bloquear e desbloquear");
 const bloq = await rpc("bank_set_card_status", { p_status: "bloqueado" });
 ok("cartão bloqueado", bloq.ok, bloq.erro);
-const lerCartao = await ler("bank_cards", "select=status&limit=1");
+// Filtrar pelo próprio usuário: existe mais de um cartão no banco (cada conta
+// testada cria o seu), e sem o filtro o `limit=1` podia devolver o de outra
+// pessoa, que continua ativo — falso negativo.
+const lerCartao = await ler("bank_cards", `select=status&user_id=eq.${uid}&limit=1`);
 ok("status do cartão é bloqueado", lerCartao[0]?.status === "bloqueado", lerCartao[0]?.status);
 
 const desbloq = await rpc("bank_set_card_status", { p_status: "ativo" });
