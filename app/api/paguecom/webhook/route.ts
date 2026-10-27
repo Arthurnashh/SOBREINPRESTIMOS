@@ -1,23 +1,35 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { carregarConfigGateway, consultarCobrancaPix } from "@/lib/paguecom";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+export const dynamic = "force-dynamic";
+
+function tokenIgual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  if (x.length !== y.length) return false;
+  try {
+    return timingSafeEqual(x, y);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Webhook do PagueCom.
  *
- * A `webhook_url` informada por cobrança não é assinada (não pertence a um
- * endpoint do painel), então o token na própria URL identifica a origem e,
- * antes de agir, o estado é confirmado em GET /v1/charges/{id}. Assim um
- * aviso forjado não libera conta nenhuma.
+ * Por `charge.*`, o aviso não chega com `X-Signature`: a URL da cobrança leva
+ * o token (?token=...) e quem a registrou identifica a origem. Antes de agir,
+ * o estado é sempre reconfirmado em GET /v1/charges/{id} com a chave da loja —
+ * assim o aviso é validado contra a verdade do gateway, não só contra o token.
  */
-export const dynamic = "force-dynamic";
-
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token") ?? "";
   const config = await carregarConfigGateway();
 
-  if (!config.webhookToken || token !== config.webhookToken) {
+  if (!config.webhookToken || !tokenIgual(token, config.webhookToken)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
@@ -38,6 +50,8 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  // Localiza a cobrança desta loja pelo provider_charge_id ou external_id.
   const { data: porProvider } = await admin
     .from("loan_fee_charges")
     .select("id, status, provider_charge_id")
@@ -46,31 +60,26 @@ export async function POST(request: Request) {
 
   const cobranca =
     porProvider ??
-    (
-      await admin
-        .from("loan_fee_charges")
-        .select("id, status, provider_charge_id")
-        .eq("external_id", externalId)
-        .maybeSingle<{ id: string; status: string; provider_charge_id: string | null }>()
+    (await admin
+      .from("loan_fee_charges")
+      .select("id, status, provider_charge_id")
+      .eq("external_id", externalId)
+      .maybeSingle<{ id: string; status: string; provider_charge_id: string | null }>()
     ).data;
 
   if (!cobranca) {
-    // Evento de outra cobrança (outra integração da mesma loja).
+    // Evento de outra cobrança da mesma loja (ou de outra integração).
     return NextResponse.json({ ok: true, ignored: true });
   }
 
   // A verdade vem sempre da consulta autenticada ao gateway.
-  const confirmada = await consultarCobrancaPix(
-    config,
-    cobranca.provider_charge_id || providerId
-  );
+  const confirmada = await consultarCobrancaPix(config, cobranca.provider_charge_id || providerId);
   if (!confirmada.ok) {
     console.error("[webhook] consulta falhou:", confirmada.error);
-    // 5xx faz o gateway reenviar depois.
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 
-  if (confirmada.data.status === "paid") {
+  if (evento === "charge.paid") {
     const { error } = await admin.rpc("loan_taxa_pagar", { p_charge_id: cobranca.id });
     if (error) {
       console.error("[webhook] falha ao aplicar pagamento:", error.message);
@@ -79,13 +88,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, pago: true });
   }
 
-  if (confirmada.data.status === "expired" || confirmada.data.status === "failed") {
-    await admin
-      .from("loan_fee_charges")
-      .update({ status: confirmada.data.status, failure: confirmada.data.failure_code })
-      .eq("id", cobranca.id)
-      .eq("status", "pending");
+  if (evento === "charge.expired" || evento === "charge.failed") {
+    if (confirmada.data.status === "expired" || confirmada.data.status === "failed") {
+      await admin
+        .from("loan_fee_charges")
+        .update({
+          status: confirmada.data.status,
+          failure: confirmada.data.failure_code,
+        })
+        .eq("id", cobranca.id)
+        .eq("status", "pending");
+    }
   }
 
-  return NextResponse.json({ ok: true, evento, status: confirmada.data.status });
+  // charge.created / charge.refunded / outros: nada a fazer no backend local.
+  // O estado pago/expirado/falhou é sempre confirmado pela consulta acima.
+  return NextResponse.json({ ok: true, ignored: evento, status: confirmada.data.status });
 }
