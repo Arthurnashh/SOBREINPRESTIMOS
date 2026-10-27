@@ -87,19 +87,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="section" style={{ paddingTop: 0, borderTop: 0 }}>
-          <div className="wrap">
-            <div className="alert alert-warn">
-              <span aria-hidden style={{ fontSize: 22 }}>⚠</span>
-              <div>
-                <strong>Cuidado com golpes</strong>
-                Nenhuma empresa séria cobra depósito, PIX, boleto ou &quot;taxa de adesão&quot; para
-                liberar empréstimo. Nós nunca pedimos isso, nem por WhatsApp, telefone ou e-mail.
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section className="section">
           <div className="wrap faq">
             <h2>Perguntas frequentes</h2>
