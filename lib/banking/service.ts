@@ -62,15 +62,22 @@ export class BankService {
     const uid = await this.uid();
     if (!uid) return null;
 
+    /*
+     * `select("*")` de propósito: a coluna `bloqueado` (taxa de confiança)
+     * entra com o loan7.sql. Se o deploy chegar antes da migração, a consulta
+     * com coluna explícita falharia e derrubaria a conta inteira; com `*` o
+     * campo só vem ausente e é tratado como zero.
+     */
     const { data } = await this.supabase
       .from("bank_accounts")
-      .select("agency, number, check_digit, balance, overdraft, status, opened_at")
+      .select("*")
       .eq("user_id", uid)
       .maybeSingle<{
         agency: string;
         number: string;
         check_digit: string;
         balance: string | number;
+        bloqueado?: string | number;
         overdraft: string | number;
         status: Account["status"];
         opened_at: string;
@@ -78,14 +85,16 @@ export class BankService {
 
     if (!data) return null;
     const balance = Number(data.balance);
+    const blocked = Number(data.bloqueado ?? 0);
     const overdraft = Number(data.overdraft);
     return {
       agency: data.agency,
       number: data.number,
       checkDigit: data.check_digit,
       balance,
+      blocked,
       overdraft,
-      available: balance + overdraft,
+      available: balance - blocked + overdraft,
       status: data.status,
       openedAt: data.opened_at,
     };
@@ -96,6 +105,8 @@ export class BankService {
     const s = (data ?? {}) as Record<string, unknown>;
     return {
       balance: Number(s.balance ?? 0),
+      blocked: Number(s.blocked ?? 0),
+      available: Number(s.available ?? s.balance ?? 0),
       overdraft: Number(s.overdraft ?? 0),
       inflow: Number(s.inflow ?? 0),
       outflow: Math.abs(Number(s.outflow ?? 0)),

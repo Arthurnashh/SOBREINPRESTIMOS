@@ -21,6 +21,11 @@ export type LoanRequest = {
   cet_yearly: number | null;
   decision_note: string | null;
   created_at: string;
+  /** Taxa de confiança criada na liberação. Null em pedidos anteriores. */
+  taxa_adesao?: number | null;
+  taxa_adesao_pct?: number | null;
+  taxa_adesao_status?: "pendente" | "aplicada" | "cancelada" | null;
+  taxa_adesao_ciente_em?: string | null;
 };
 
 export const STATUS_LABEL: Record<LoanRequest["status"], string> = {

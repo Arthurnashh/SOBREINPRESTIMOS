@@ -89,6 +89,17 @@ export type Simulation = {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Valor da taxa de confiança para uma parcela.
+ *
+ * É uma fração da parcela (LOAN.taxaAdesaoPct, 50% por padrão): parcela de
+ * R$ 100,00 -> taxa de R$ 50,00. O valor não é custo extra — ele é abatido
+ * no valor da primeira parcela.
+ */
+export function taxaAdesao(installmentValue: number, pct = LOAN.taxaAdesaoPct) {
+  return round2(installmentValue * pct);
+}
+
 /** Parcela fixa pela Tabela Price. */
 export function pmt(pv: number, rate: number, n: number) {
   if (rate === 0) return pv / n;

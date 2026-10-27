@@ -83,3 +83,47 @@ export async function cancelLoan(formData: FormData) {
     .eq("status", "em_analise");
   revalidatePath("/conta");
 }
+
+/* =====================================================================
+   Taxa de confiança (adesão)
+
+   A taxa é criada pelo banco no ato da liberação (supabase/loan7.sql) e
+   nasce com o valor liberado bloqueado na conta. As duas ações abaixo são
+   a ponte para as funções SECURITY DEFINER: uma registra o "ciente" do
+   aviso, a outra debita a taxa, libera o saldo e abate a 1ª parcela.
+   ===================================================================== */
+
+export type TaxaResult = { ok?: true; taxa?: number; error?: string };
+
+function erroTaxa(msg: string): string {
+  const m = msg.replace(/^.*?:\s*/, "");
+  if (/saldo insuficiente/i.test(m)) return "Saldo insuficiente para aplicar a taxa.";
+  if (/não autenticado|jwt/i.test(m)) return "Sua sessão expirou. Entre novamente.";
+  if (/acesso restrito|não autorizado/i.test(m)) return "Você não tem acesso a este pedido.";
+  if (/não está liberado/i.test(m)) return "O empréstimo ainda não foi liberado.";
+  if (/não tem taxa/i.test(m)) return "Este pedido não tem taxa de confiança.";
+  return m || "Não foi possível concluir agora. Tente novamente.";
+}
+
+/** Cliente leu o aviso. Não move dinheiro; o saldo continua bloqueado. */
+export async function dispensarTaxaAdesao(loanId: string): Promise<TaxaResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("loan_taxa_confirmar", { p_loan_id: loanId });
+  if (error) return { error: erroTaxa(error.message) };
+
+  revalidatePath("/conta");
+  revalidatePath("/conta/emprestimos");
+  return { ok: true };
+}
+
+/** Debita a taxa, libera o saldo e abate o valor na primeira parcela. */
+export async function aplicarTaxaAdesao(loanId: string): Promise<TaxaResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("loan_taxa_aplicar", { p_loan_id: loanId });
+  if (error) return { error: erroTaxa(error.message) };
+
+  revalidatePath("/conta");
+  revalidatePath("/conta/emprestimos");
+  revalidatePath("/conta/banco");
+  return { ok: true, taxa: Number((data as { taxa?: number } | null)?.taxa ?? 0) };
+}

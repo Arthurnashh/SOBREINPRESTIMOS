@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/account";
 import { getBanking } from "@/lib/banking";
+import { LOAN } from "@/lib/config";
 import { brl, date, pct } from "@/lib/format";
 import { PERIODO, type Periodicidade } from "@/lib/loan";
 import Parcelas, { type Parcela } from "@/components/Parcelas";
+import TaxaAdesao from "@/components/TaxaAdesao";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Meus empréstimos" };
@@ -21,6 +23,10 @@ type Contrato = {
     taxa_periodo: number | null;
     created_at: string;
     seguro_tipo: string | null;
+    taxa_adesao: number | null;
+    taxa_adesao_pct: number | null;
+    taxa_adesao_status: "pendente" | "aplicada" | "cancelada" | null;
+    taxa_adesao_ciente_em: string | null;
   };
   parcelas: Parcela[];
   total_pago: number;
@@ -68,8 +74,23 @@ export default async function MeusEmprestimosPage() {
 
   const totalDevedor = contratos.reduce((s, c) => s + Number(c.saldo_devedor ?? 0), 0);
 
+  const taxaPendente =
+    contratos.find(
+      (c) => c.pedido.taxa_adesao_status === "pendente" && c.pedido.taxa_adesao != null
+    ) ?? null;
+
   return (
     <div className="stack" style={{ ["--gap" as string]: "20px" }}>
+      {taxaPendente && (
+        <TaxaAdesao
+          loanId={taxaPendente.pedido.id}
+          parcela={Number(taxaPendente.pedido.installment_value ?? 0)}
+          taxa={Number(taxaPendente.pedido.taxa_adesao ?? 0)}
+          percentual={Number(taxaPendente.pedido.taxa_adesao_pct ?? LOAN.taxaAdesaoPct)}
+          ciente={Boolean(taxaPendente.pedido.taxa_adesao_ciente_em)}
+        />
+      )}
+
       <div>
         <h1 className="page-title">Meus empréstimos</h1>
         <p className="muted">
@@ -200,6 +221,17 @@ export default async function MeusEmprestimosPage() {
                 <dt>Total do contrato</dt>
                 <dd>{brl(Number(c.total_contrato))}</dd>
               </div>
+              {p.taxa_adesao != null && (
+                <div>
+                  <dt>Taxa de confiança</dt>
+                  <dd>
+                    {brl(Number(p.taxa_adesao))}{" "}
+                    {p.taxa_adesao_status === "aplicada"
+                      ? "— abatida na 1ª parcela"
+                      : "— retida no saldo"}
+                  </dd>
+                </div>
+              )}
               {p.seguro_tipo && (
                 <div>
                   <dt>Garantia declarada</dt>

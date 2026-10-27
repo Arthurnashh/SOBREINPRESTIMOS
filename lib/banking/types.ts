@@ -5,6 +5,8 @@ export type Account = {
   number: string;
   checkDigit: string;
   balance: number;
+  /** Parte do saldo retida (ex.: taxa de confiança aguardando confirmação). */
+  blocked: number;
   overdraft: number;
   available: number;
   status: "ativa" | "bloqueada" | "encerrada";
@@ -79,6 +81,8 @@ export type Boleto = {
 
 export type Summary = {
   balance: number;
+  blocked: number;
+  available: number;
   overdraft: number;
   inflow: number;
   outflow: number;

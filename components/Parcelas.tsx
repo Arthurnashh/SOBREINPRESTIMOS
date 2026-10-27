@@ -145,8 +145,7 @@ export default function Parcelas({
           <div className="aviso-gateway">
             <strong>Cobrança ainda não está ativa.</strong> Este boleto/PIX foi gerado para
             consulta e <strong>não pode ser pago</strong> até a integração com o meio de pagamento
-            ser concluída. Não pague por fora — a empresa nunca cobra valor antecipado para liberar
-            empréstimo.
+            ser concluída. Não pague nenhum valor fora deste aplicativo.
           </div>
 
           <div className="field">

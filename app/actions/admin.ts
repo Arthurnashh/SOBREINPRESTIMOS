@@ -77,7 +77,7 @@ export async function decideLoan(
           "Pedido marcado como liberado, mas o crédito na conta falhou. Rode o crédito novamente pelo pedido.",
       };
     }
-    return { success: "Pedido liberado e valor creditado na conta do cliente." };
+    return { success: "Pedido liberado e valor creditado na conta do cliente. O saldo fica bloqueado até a confirmação da taxa de confiança." };
   }
 
   if (decision === "aprovar") {

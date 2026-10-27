@@ -111,6 +111,27 @@ input[type="range"] { width: 100%; accent-color: var(--brand); height: 28px; }
 .alert-ok { background: var(--ok-bg); color: var(--ok-ink); }
 .alert-info { background: var(--brand-soft); color: var(--brand); }
 
+/* ---------- modal da taxa de confiança ---------- */
+.modal-fundo {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  padding: 20px; background: rgba(19, 33, 28, .55);
+}
+.modal-caixa {
+  width: 100%; max-width: 460px; max-height: calc(100vh - 40px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+  padding: 26px; box-shadow: 0 24px 60px rgba(19, 33, 28, .28);
+}
+.modal-caixa h2 { font-size: 26px; }
+.modal-valor {
+  font-family: var(--display); font-size: 42px; font-weight: 600;
+  letter-spacing: -0.03em; color: var(--brand); margin: 16px 0 2px;
+}
+.modal-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+@media (max-width: 420px) {
+  .modal-caixa { padding: 22px 18px; }
+  .modal-acoes .btn { width: 100%; }
+}
+
 .faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
 .faq summary { cursor: pointer; font-weight: 700; font-size: 17px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
 .faq summary::after { content: "+"; font-size: 22px; line-height: 1; color: var(--brand); }

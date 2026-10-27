@@ -106,8 +106,11 @@ tocar, mesmo com todo o CSS responsivo correto. Está declarada lá, com
     (`loan_installment_charge`) e o resumo do contrato (`loan_contrato`)
 11. `supabase/loan6.sql` — **periodicidade**: `loan_request` aceita semanal,
     quinzenal ou mensal, com a taxa do período gravada no pedido
+12. `supabase/loan7.sql` — **taxa de confiança**: taxa de 50% da parcela
+    retida no saldo na liberação, confirmação pelo cliente, abatimento na 1ª
+    parcela e `bloqueado` na conta (o disponível passa a descontar o bloqueio)
 
-Os onze são idempotentes (`if not exists` / `drop policy if exists` /
+Os doze são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
@@ -126,6 +129,10 @@ Os onze são idempotentes (`if not exists` / `drop policy if exists` /
 > `admin3.sql` redefine `kyc_pode_movimentar`, que é usada por `bank_move`,
 > `bank_schedule`, `bank_run_schedules` e pela policy de criar pedido. Rodar
 > depois de `kyc.sql`, senão a isenção do admin se perde.
+>
+> `loan7.sql` também redefine `bank_move` — ele parte da versão do `kyc.sql`
+> (com o gate de identidade) e só acrescenta o desconto do saldo bloqueado.
+> Por isso precisa rodar **depois** de `kyc.sql`; rodar antes apaga o gate.
 >
 > `loan4.sql` é obrigatório para o empréstimo funcionar: `authenticated` **não
 > tem INSERT** em nenhuma tabela deste sistema — toda escrita passa por função

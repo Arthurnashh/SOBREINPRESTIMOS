@@ -109,8 +109,8 @@ export default function PainelInicio({
           <h2>Precisa de crédito?</h2>
         </header>
         <p className="fine">
-          Você tem até {brl(20000)} disponíveis para simular. Sem taxa antecipada — o valor cai na sua
-          conta e você paga só as parcelas.
+          Você tem até {brl(20000)} disponíveis para simular. Sujeito a análise: a liberação retém a
+          taxa de confiança no saldo e o valor é abatido na primeira parcela.
         </p>
         <Link href="/conta/emprestimo" className="btn btn-primary" style={{ justifySelf: "start" }}>
           Simular empréstimo

@@ -6,6 +6,12 @@ export const LOAN = {
   monthlyRate: Number(process.env.NEXT_PUBLIC_TAXA_MENSAL ?? "0.0399"),
   // Limite do produto no painel; não representa uma definição de teto legal.
   maxMonthlyRate: 0.2,
+  /**
+   * Taxa de confiança cobrada na liberação: fração do valor da parcela.
+   * 0,5 = metade da parcela. Precisa ficar igual ao `v_pct` de
+   * supabase/loan7.sql — o banco grava a taxa usada em cada pedido.
+   */
+  taxaAdesaoPct: Number(process.env.NEXT_PUBLIC_TAXA_ADESAO_PCT ?? "0.5"),
 };
 
 export const COMPANY = {

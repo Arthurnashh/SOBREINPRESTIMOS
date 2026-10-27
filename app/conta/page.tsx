@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { cancelLoan } from "@/app/actions/loans";
+import TaxaAdesao from "@/components/TaxaAdesao";
 import { requireSession, STATUS_LABEL, type LoanRequest } from "@/lib/account";
 import { getBanking, KIND_LABEL } from "@/lib/banking";
+import { LOAN } from "@/lib/config";
 import { brl, date, pct } from "@/lib/format";
 import { simulate } from "@/lib/loan";
 
@@ -19,9 +21,15 @@ export default async function ContaPage({
   await bank.ensureAccount();
 
   const [{ data: loans }, account, extrato] = await Promise.all([
+    /*
+     * `*` e não colunas explícitas: as colunas da taxa de confiança só
+     * existem depois do loan7.sql. Selecioná-las antes da migração faria o
+     * PostgREST recusar a consulta e a lista de pedidos sumir. Com `*`, os
+     * campos ausentes chegam indefinidos e o aviso simplesmente não abre.
+     */
     supabase
       .from("loan_requests")
-      .select("id, amount, installments, status, monthly_rate, installment_value, cet_yearly, decision_note, created_at")
+      .select("*")
       .order("created_at", { ascending: false })
       .returns<LoanRequest[]>(),
     bank.getAccount(),
@@ -31,8 +39,27 @@ export default async function ContaPage({
   const firstName = profile?.full_name.split(" ")[0] ?? "";
   const hasOpen = loans?.some((l) => l.status === "em_analise" || l.status === "aprovado");
 
+  // Pedido liberado cuja taxa de confiança ainda não foi confirmada.
+  const taxaPendente =
+    loans?.find(
+      (l) =>
+        l.status === "liberado" &&
+        l.taxa_adesao_status === "pendente" &&
+        l.taxa_adesao != null
+    ) ?? null;
+
   return (
     <div className="stack" style={{ ["--gap" as string]: "20px" }}>
+      {taxaPendente && (
+        <TaxaAdesao
+          loanId={taxaPendente.id}
+          parcela={Number(taxaPendente.installment_value ?? 0)}
+          taxa={Number(taxaPendente.taxa_adesao ?? 0)}
+          percentual={Number(taxaPendente.taxa_adesao_pct ?? LOAN.taxaAdesaoPct)}
+          ciente={Boolean(taxaPendente.taxa_adesao_ciente_em)}
+        />
+      )}
+
       <div>
         <h1 className="page-title">Olá, {firstName}</h1>
         <p className="muted">Aqui está o resumo da sua conta.</p>
@@ -42,7 +69,7 @@ export default async function ContaPage({
         <div className="alert alert-ok" role="status">
           <div>
             <strong>Pedido enviado para análise.</strong>
-            Você verá o resultado aqui. Nunca pediremos pagamento para liberar o valor.
+            Você verá o resultado aqui.
           </div>
         </div>
       )}
@@ -52,7 +79,12 @@ export default async function ContaPage({
           <div className="kpi-label">Saldo disponível</div>
           {account ? (
             <>
-              <div className="kpi">{brl(account.balance)}</div>
+              <div className="kpi">{brl(account.available)}</div>
+              {account.blocked > 0 && (
+                <p className="fine" style={{ marginTop: 6 }}>
+                  {brl(account.blocked)} bloqueado — taxa de confiança aguardando confirmação.
+                </p>
+              )}
               <p className="muted" style={{ marginTop: 6 }}>
                 Ag. {account.agency} · Conta {account.number}-{account.checkDigit}
               </p>
@@ -74,7 +106,8 @@ export default async function ContaPage({
           <div className="kpi-label">Crédito</div>
           <div className="kpi">até {brl(20000)}</div>
           <p className="muted" style={{ marginTop: 6 }}>
-            Sem taxa antecipada. Sujeito a análise.
+            Sujeito a análise. Taxa de confiança de {pct(LOAN.taxaAdesaoPct, 0)} da primeira
+            parcela, abatida no primeiro mês.
           </p>
           {!hasOpen && (
             <Link href="/conta/emprestimo" className="btn btn-primary" style={{ marginTop: 16 }}>

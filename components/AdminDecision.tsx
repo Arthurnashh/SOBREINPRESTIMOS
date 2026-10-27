@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { decideLoan } from "@/app/actions/admin";
 import { LOAN } from "@/lib/config";
 import { brl, pct } from "@/lib/format";
-import { simulate } from "@/lib/loan";
+import { simulate, taxaAdesao } from "@/lib/loan";
 
 type Props = {
   id: string;
@@ -82,6 +82,13 @@ export default function AdminDecision({ id, amount, installments, defaultRate, s
             <div className="sim-result">
               <dl className="rows">
                 <div><dt>Parcela</dt><dd>{brl(sim.installmentValue)} × {installments}</dd></div>
+                <div>
+                  <dt>Taxa de confiança</dt>
+                  <dd>
+                    {brl(taxaAdesao(sim.installmentValue))} ({pct(LOAN.taxaAdesaoPct, 0)} da
+                    parcela, abatida na 1ª)
+                  </dd>
+                </div>
                 <div><dt>IOF estimado</dt><dd>{brl(sim.iof)}</dd></div>
                 <div><dt>Total a pagar</dt><dd>{brl(sim.total)}</dd></div>
                 <div><dt>CET</dt><dd>{pct(sim.cetMonthly)} a.m. · {pct(sim.cetYearly)} a.a.</dd></div>
@@ -115,7 +122,9 @@ export default function AdminDecision({ id, amount, installments, defaultRate, s
       {status === "aprovado" && (
         <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16 }}>
           <p className="muted" style={{ marginBottom: 10 }}>
-            Após a assinatura do contrato e o desembolso pela instituição parceira:
+            Após a assinatura do contrato e o desembolso pela instituição parceira. A liberação
+            credita o valor integral e mantém o saldo bloqueado até o cliente confirmar a taxa de
+            confiança — o valor é abatido na primeira parcela.
           </p>
           <button type="button" className="btn btn-primary" onClick={() => agir("liberar")} disabled={pendente}>
             {pendente ? "Processando…" : "Marcar como liberado"}
