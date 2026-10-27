@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { modalAberto, passo, type FotoGaleria } from "@/lib/kyc/galeria";
+import { ehPdf, modalAberto, passo, type FotoGaleria } from "@/lib/kyc/galeria";
 
 export type { FotoGaleria };
 
@@ -79,6 +79,7 @@ export default function ModalFoto({ fotos, indice, onFechar, onIr }: Props) {
 
   const atual = indice;
   const foto = fotos[atual];
+  const pdf = ehPdf(foto.url);
 
   return (
     <div
@@ -97,14 +98,18 @@ export default function ModalFoto({ fotos, indice, onFechar, onIr }: Props) {
             </span>
           </div>
           <div className="modal-foto-acoes">
-            <button
-              type="button"
-              className="bank-acao"
-              onClick={() => setZoom((z) => !z)}
-              aria-label={zoom ? "Reduzir" : "Ampliar"}
-            >
-              {zoom ? "Reduzir" : "Ampliar"}
-            </button>
+            {/* O zoom é CSS, que não se aplica a PDF — o visualizador nativo
+                já tem o próprio controle de escala. */}
+            {!pdf && (
+              <button
+                type="button"
+                className="bank-acao"
+                onClick={() => setZoom((z) => !z)}
+                aria-label={zoom ? "Reduzir" : "Ampliar"}
+              >
+                {zoom ? "Reduzir" : "Ampliar"}
+              </button>
+            )}
             <button
               type="button"
               className="bank-acao"
@@ -118,7 +123,7 @@ export default function ModalFoto({ fotos, indice, onFechar, onIr }: Props) {
           </div>
         </header>
 
-        <div className={`modal-foto-palco${zoom ? " ampliado" : ""}`}>
+        <div className={`modal-foto-palco${zoom ? " ampliado" : ""}${pdf ? " pdf" : ""}`}>
           {total > 1 && (
             <button
               type="button"
@@ -126,29 +131,48 @@ export default function ModalFoto({ fotos, indice, onFechar, onIr }: Props) {
               onClick={anterior}
               aria-label="Foto anterior"
             >
-              â€¹
+              ‹
             </button>
           )}
 
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={foto.url}
-            alt={foto.legenda}
-            className={zoom ? "ampliada" : ""}
-            onClick={() => setZoom((z) => !z)}
-          />
+          {/* PDF não abre em <img> — o navegador não decodifica e o palco
+              ficava em branco. Vai num <iframe>, que usa o visualizador
+              nativo. O zoom por CSS não se aplica a PDF, então a classe
+              `ampliada` só entra na imagem. */}
+          {pdf ? (
+            <iframe
+              src={foto.url}
+              title={foto.legenda}
+              className="modal-foto-pdf"
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={foto.url}
+              alt={foto.legenda}
+              className={zoom ? "ampliada" : ""}
+              onClick={() => setZoom((z) => !z)}
+            />
+          )}
 
           {total > 1 && (
             <button
               type="button"
               className="modal-foto-seta dir"
               onClick={proxima}
-              aria-label="PrÃ³xima foto"
+              aria-label="Próxima foto"
             >
-              â€º
+              ›
             </button>
           )}
         </div>
+
+        {pdf && (
+          <p className="fine modal-foto-aviso">
+            Documento em PDF. Se não aparecer, use <strong>Abrir original</strong> — alguns
+            navegadores de celular não exibem PDF embutido.
+          </p>
+        )}
 
         {total > 1 && (
           <div className="modal-foto-miniaturas">
@@ -156,12 +180,20 @@ export default function ModalFoto({ fotos, indice, onFechar, onIr }: Props) {
               <button
                 type="button"
                 key={f.chave}
-                className={`modal-foto-mini${i === atual ? " ativa" : ""}`}
+                className={`modal-foto-mini${i === atual ? " ativa" : ""}${ehPdf(f.url) ? " pdf" : ""}`}
                 onClick={() => onIr(i)}
                 title={f.legenda}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.url} alt={f.legenda} />
+                {/* Miniatura de PDF não pode ser <img>: quebraria do mesmo
+                    jeito que quebrava no palco. Mostra um selo "PDF". */}
+                {ehPdf(f.url) ? (
+                  <span className="modal-foto-mini-pdf" aria-hidden>
+                    PDF
+                  </span>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={f.url} alt={f.legenda} />
+                )}
               </button>
             ))}
           </div>

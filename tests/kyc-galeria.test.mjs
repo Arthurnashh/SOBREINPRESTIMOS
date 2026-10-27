@@ -12,6 +12,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  ehImagem,
+  ehPdf,
   indiceValido,
   modalAberto,
   montarGaleria,
@@ -103,4 +105,48 @@ test("modalAberto só aceita índice dentro da lista", () => {
   assert.equal(modalAberto(3, null), false);
   assert.equal(modalAberto(0, 0), false);
   assert.equal(modalAberto(3, 1.5), false);
+});
+
+/* ---------------------- PDF x imagem no modal --------------------------- */
+/*
+ * O documento pode chegar como foto da câmera (JPEG/PNG) ou como PDF baixado
+ * do banco. O modal renderizava tudo em <img>, e PDF dentro de <img> não
+ * decodifica: o palco ficava em branco, sem erro. Estes testes fixam a regra
+ * que decide entre <img> e <iframe>.
+ */
+
+// A URL assinada do Supabase termina com ?token=... — a extensão está antes.
+const ASSINATURA = "?token=eyJhbGciOiJIUzI1NiJ9.abc";
+
+test("reconhece PDF pela extensão do caminho", () => {
+  assert.equal(ehPdf(`https://x.supabase.co/storage/v1/object/sign/kyc/u/doc-1.pdf${ASSINATURA}`), true);
+  assert.equal(ehPdf("https://x.supabase.co/storage/v1/object/sign/kyc/u/doc-1.PDF"), true);
+});
+
+test("não confunde imagem com PDF", () => {
+  for (const ext of ["jpg", "jpeg", "png", "webp"]) {
+    assert.equal(
+      ehPdf(`https://x/kyc/u/foto.${ext}${ASSINATURA}`),
+      false,
+      `${ext} não é PDF`
+    );
+    assert.equal(ehImagem(`https://x/kyc/u/foto.${ext}${ASSINATURA}`), true);
+  }
+});
+
+test("token terminando em pdf não engana a detecção", () => {
+  // Por isto a extensão sai do caminho, e não da URL inteira.
+  const url = "https://x/kyc/u/doc-1.jpg?token=abc.pdf";
+  assert.equal(ehPdf(url), false, "a query string decidiu o tipo do arquivo");
+  assert.equal(ehImagem(url), true);
+});
+
+test("ignora fragmento (#) além da query", () => {
+  assert.equal(ehPdf("https://x/kyc/u/doc.pdf#page=2"), true);
+  assert.equal(ehImagem("https://x/kyc/u/foto.jpg#top"), true);
+});
+
+test("extensão desconhecida não é tratada como imagem nem como PDF", () => {
+  assert.equal(ehPdf("https://x/kyc/u/arquivo.doc"), false);
+  assert.equal(ehImagem("https://x/kyc/u/arquivo.doc"), false);
 });

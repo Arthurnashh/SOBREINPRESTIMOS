@@ -10,6 +10,28 @@
 export type FotoGaleria = { chave: string; legenda: string; url: string };
 
 /**
+ * O arquivo é um PDF?
+ *
+ * O cliente pode enviar o documento como foto da câmera (JPEG/PNG) ou como
+ * PDF baixado do banco. Um PDF dentro de `<img>` não renderiza: o navegador
+ * não tem como decodificar, e o palco do modal ficava em branco.
+ *
+ * A extensão precisa ser lida do CAMINHO, não da URL inteira: a URL assinada
+ * do Supabase carrega `?token=...` no fim, e testar a string toda daria falso
+ * positivo em qualquer arquivo cujo token terminasse em "pdf".
+ */
+export function ehPdf(url: string): boolean {
+  const semQuery = url.split("?")[0].split("#")[0];
+  return /\.pdf$/i.test(semQuery);
+}
+
+/** O arquivo é uma imagem que o navegador consegue exibir direto? */
+export function ehImagem(url: string): boolean {
+  const semQuery = url.split("?")[0].split("#")[0];
+  return /\.(jpe?g|png|webp|gif|avif|heic|heif|bmp)$/i.test(semQuery);
+}
+
+/**
  * Monta a lista de fotos navegáveis a partir do que veio do servidor.
  *
  * O servidor devolve TODAS as chaves conhecidas, com `null` nas não enviadas.
