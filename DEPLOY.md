@@ -59,8 +59,12 @@ no painel. Para um site dormente, vale o plano pago de US$25.
    PIX, agendamento, DDA, comprovantes, tarifas, limites e dados cadastrais
 5. `supabase/kyc.sql` — **verificação de identidade**: bucket privado, envio de
    documentos, biometria, fila de análise e o bloqueio de movimentação
+6. `supabase/admin2.sql` — **painel administrativo**: lista de todas as contas,
+   ficha completa (dados, KYC com as 9 fotos, saldo, extrato, cartão, PIX,
+   limites, empréstimos), ajuste de saldo e bloqueio de conta/cartão, com
+   trilha de auditoria
 
-Os cinco são idempotentes (`if not exists` / `drop policy if exists` /
+Os seis são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
@@ -70,6 +74,11 @@ Os cinco são idempotentes (`if not exists` / `drop policy if exists` /
 > `check` faz a função recusar a operação com "tipo de movimentação inválido".
 > `kyc.sql` **redefine `bank_move`** para inserir o gate do KYC antes da checagem
 > de saldo, então tem de ser o último. Rode os três por último, nesta ordem.
+>
+> `admin2.sql` depende de `bank_accounts`, `bank_cards`, `kyc_submissions` e
+> `admin_auditoria` — por isso vem depois de todos. Ele **não** mexe em
+> `bank_move`: o ajuste de saldo do admin é feito por `admin_ajustar_saldo`,
+> que insere o lançamento no extrato e atualiza o saldo na mesma transação.
 
 ### A conta bancária
 
