@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import { requestLoan, type LoanFormState } from "@/app/actions/loans";
+import { requestLoan, SEGURO_LABEL, SEGURO_TIPOS, type LoanFormState } from "@/app/actions/loans";
 import { LOAN } from "@/lib/config";
 import { brl, pct } from "@/lib/format";
 import { simulate } from "@/lib/loan";
@@ -16,6 +16,7 @@ type Props = {
 export default function Simulator({ mode, initialAmount = 5000, initialInstallments = 12 }: Props) {
   const [amount, setAmount] = useState(initialAmount);
   const [installments, setInstallments] = useState(initialInstallments);
+  const [seguro, setSeguro] = useState("");
   const [state, action, pending] = useActionState<LoanFormState, FormData>(requestLoan, undefined);
   const sim = useMemo(() => simulate(amount, installments), [amount, installments]);
 
@@ -118,6 +119,48 @@ export default function Simulator({ mode, initialAmount = 5000, initialInstallme
   return (
     <form action={action} className="card">
       {body}
+
+      {/* Declaração de garantias. Obrigatória: é o que permite à análise
+          separar quem tem garantia real de quem não tem. */}
+      <fieldset className="field" style={{ marginTop: 24, border: 0, padding: 0 }}>
+        <legend style={{ fontWeight: 600, marginBottom: 4 }}>
+          Você possui algum tipo de seguro ou garantia?
+        </legend>
+        <p className="hint" style={{ marginBottom: 10 }}>
+          Marque a opção que se aplica. Ter garantia ajuda na análise do seu pedido.
+        </p>
+
+        <div className="opcoes-seguro">
+          {SEGURO_TIPOS.map((t) => (
+            <label key={t} className="opcao">
+              <input
+                type="radio"
+                name="seguro_tipo"
+                value={t}
+                checked={seguro === t}
+                onChange={() => setSeguro(t)}
+                required
+              />
+              <span>{SEGURO_LABEL[t]}</span>
+            </label>
+          ))}
+        </div>
+
+        {seguro === "outro" && (
+          <div className="field" style={{ marginTop: 12 }}>
+            <label htmlFor="seguro_descricao">Descreva a sua situação</label>
+            <textarea
+              id="seguro_descricao"
+              name="seguro_descricao"
+              maxLength={300}
+              required
+              placeholder="Ex.: tenho uma moto em nome do meu pai e sou sócio de uma loja"
+            />
+            <span className="hint">Até 300 caracteres.</span>
+          </div>
+        )}
+      </fieldset>
+
       <label className="checkbox" style={{ marginTop: 20 }}>
         <input type="checkbox" name="confirm" required />
         <span>

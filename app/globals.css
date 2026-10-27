@@ -139,6 +139,30 @@ input[type="range"] { width: 100%; accent-color: var(--brand); height: 28px; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .checkbox { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink-2); }
 .checkbox input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); flex: none; }
+
+/* Escolha de garantia no pedido de empréstimo. Cada opção é uma linha
+   clicável inteira — no celular, mirar só no círculo do rádio é ruim. */
+.opcoes-seguro { display: grid; gap: 8px; }
+.opcoes-seguro .opcao {
+  display: flex; gap: 10px; align-items: center;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+  background: #fff;
+  transition: border-color .15s ease, background .15s ease;
+}
+.opcoes-seguro .opcao:hover { border-color: var(--brand); }
+.opcoes-seguro .opcao input { width: 18px; height: 18px; accent-color: var(--brand); flex: none; }
+/* Destaque na opção escolhida, para não restar dúvida do que foi marcado. */
+.opcoes-seguro .opcao:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-soft, #eef4f0);
+  color: var(--ink);
+  font-weight: 600;
+}
 .muted { color: var(--muted); }
 .center { text-align: center; }
 

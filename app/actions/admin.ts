@@ -9,14 +9,32 @@ import { createClient } from "@/lib/supabase/server";
 
 export type AdminFormState = { error?: string; success?: string } | undefined;
 
-export async function decideLoan(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+/**
+ * Decide um pedido de empréstimo.
+ *
+ * Recebe os valores como argumentos, e não lê de um FormData.
+ *
+ * Por quê: o formulário usa `useActionState`, e nesse modo o React envia o
+ * FormData capturado no momento da renderização. O `value` do botão clicado
+ * (`<button name="decision" value="aprovar">`) NÃO entra nesse FormData — o
+ * navegador só anexa o valor do botão no envio nativo, que aqui não acontece.
+ * O resultado era `decision` vazio e a resposta "Ação inválida." em todo
+ * clique de aprovar/recusar/liberar.
+ *
+ * Passando por argumento, o valor vem do clique e não tem como se perder.
+ */
+export async function decideLoan(
+  decision: "aprovar" | "recusar" | "liberar",
+  id: string,
+  monthlyRate: number | null,
+  note: string | null
+): Promise<AdminFormState> {
   const { supabase } = await requireAdmin();
 
-  const id = String(formData.get("id") ?? "");
-  const decision = String(formData.get("decision") ?? "");
-  const note = String(formData.get("note") ?? "").slice(0, 200) || null;
+  const nota = note ? String(note).slice(0, 200) || null : null;
 
   if (!id) return { error: "Pedido inválido." };
+  if (!["aprovar", "recusar", "liberar"].includes(decision)) return { error: "Ação inválida." };
 
   // Lê o pedido (admin tem leitura total por RLS).
   const { data: loan } = await supabase
@@ -31,10 +49,11 @@ export async function decideLoan(_prev: AdminFormState, formData: FormData): Pro
     const { error } = await supabase.rpc("admin_set_decision", {
       p_id: id,
       p_status: "recusado",
-      p_note: note,
+      p_note: nota,
     });
     if (error) return { error: "Não foi possível recusar." };
     revalidatePath("/admin");
+    revalidatePath("/admin/pedido/" + id);
     return { success: "Pedido recusado." };
   }
 
@@ -42,7 +61,7 @@ export async function decideLoan(_prev: AdminFormState, formData: FormData): Pro
     const { error } = await supabase.rpc("admin_set_decision", {
       p_id: id,
       p_status: "liberado",
-      p_note: note,
+      p_note: nota,
     });
     if (error) return { error: "Não foi possível marcar como liberado." };
 
@@ -62,7 +81,7 @@ export async function decideLoan(_prev: AdminFormState, formData: FormData): Pro
   }
 
   if (decision === "aprovar") {
-    const rate = Number(String(formData.get("monthly_rate") ?? "").replace(",", "."));
+    const rate = Number(monthlyRate);
     if (!Number.isFinite(rate) || rate <= 0) return { error: "Informe a taxa mensal." };
     if (rate > LOAN.maxMonthlyRate) {
       return {
@@ -81,10 +100,11 @@ export async function decideLoan(_prev: AdminFormState, formData: FormData): Pro
       p_iof: sim.iof,
       p_installment: sim.installmentValue,
       p_cet: sim.cetYearly,
-      p_note: note,
+      p_note: nota,
     });
     if (error) return { error: "Não foi possível aprovar." };
     revalidatePath("/admin");
+    revalidatePath("/admin/pedido/" + id);
     return { success: "Pedido aprovado com as condições calculadas." };
   }
 

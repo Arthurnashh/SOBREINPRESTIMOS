@@ -5,15 +5,27 @@ import { requireAdmin, STATUS_LABEL, type LoanRequest, type Profile } from "@/li
 import { LOAN } from "@/lib/config";
 import { brl, date, formatCpf, pct } from "@/lib/format";
 
+/** Rótulos das garantias. Espelha o check de loan_requests no banco. */
+const SEGURO_TEXTO: Record<string, string> = {
+  veiculo: "Veículo em seu nome",
+  imovel: "Imóvel próprio",
+  vida: "Seguro de vida",
+  residencial: "Seguro residencial",
+  consignado: "Margem consignável ou convênio",
+  fiador: "Fiador",
+  nenhum: "Nenhuma garantia",
+  outro: "Outra situação",
+};
+
 export default async function PedidoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase } = await requireAdmin();
 
   const { data: loan } = await supabase
     .from("loan_requests")
-    .select("id, user_id, amount, installments, status, monthly_rate, iof, installment_value, cet_yearly, decision_note, created_at")
+    .select("id, user_id, amount, installments, status, monthly_rate, iof, installment_value, cet_yearly, decision_note, created_at, seguro_tipo, seguro_descricao")
     .eq("id", id)
-    .maybeSingle<LoanRequest & { user_id: string; iof: number | null }>();
+    .maybeSingle<LoanRequest & { user_id: string; iof: number | null; seguro_tipo: string | null; seguro_descricao: string | null }>();
 
   if (!loan) notFound();
 
@@ -64,6 +76,28 @@ export default async function PedidoPage({ params }: { params: Promise<{ id: str
           {loan.decision_note && <p className="fine" style={{ marginTop: 10 }}>Obs.: {loan.decision_note}</p>}
         </section>
       </div>
+
+      <section className="card">
+        <h2 style={{ fontSize: 20, marginBottom: 12 }}>Garantias declaradas</h2>
+        {loan.seguro_tipo ? (
+          <dl className="rows">
+            <div>
+              <dt>Situação</dt>
+              <dd>{SEGURO_TEXTO[loan.seguro_tipo] ?? loan.seguro_tipo}</dd>
+            </div>
+            {loan.seguro_descricao && (
+              <div>
+                <dt>Descrição</dt>
+                <dd>{loan.seguro_descricao}</dd>
+              </div>
+            )}
+          </dl>
+        ) : (
+          <p className="muted">
+            Este pedido é anterior à pergunta sobre garantias, então não há declaração.
+          </p>
+        )}
+      </section>
 
       <AdminDecision
         id={loan.id}

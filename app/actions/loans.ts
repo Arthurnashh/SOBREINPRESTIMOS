@@ -3,19 +3,59 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { LOAN } from "@/lib/config";
 import { isValidRequest } from "@/lib/loan";
 
 export type LoanFormState = { error?: string } | undefined;
+
+/** Situações de garantia aceitas. Espelha o check de loan_requests.no banco. */
+export const SEGURO_TIPOS = [
+  "veiculo",
+  "imovel",
+  "vida",
+  "residencial",
+  "consignado",
+  "fiador",
+  "nenhum",
+  "outro",
+] as const;
+
+export const SEGURO_LABEL: Record<(typeof SEGURO_TIPOS)[number], string> = {
+  veiculo: "Tenho veículo em meu nome",
+  imovel: "Tenho imóvel próprio",
+  vida: "Tenho seguro de vida",
+  residencial: "Tenho seguro residencial",
+  consignado: "Tenho margem consignável ou convênio",
+  fiador: "Tenho fiador",
+  nenhum: "Não tenho nenhuma dessas garantias",
+  outro: "Outra situação",
+};
 
 export async function requestLoan(_prev: LoanFormState, formData: FormData): Promise<LoanFormState> {
   const amount = Number(formData.get("amount"));
   const installments = Number(formData.get("installments"));
 
+  const faixa = `R$ ${LOAN.min.toLocaleString("pt-BR")} e R$ ${LOAN.max.toLocaleString("pt-BR")}`;
   if (!isValidRequest(amount, installments)) {
-    return { error: "Escolha um valor entre R$ 1.000 e R$ 10.000 e um prazo válido." };
+    return { error: `Escolha um valor entre ${faixa} e um prazo válido.` };
   }
   if (formData.get("confirm") !== "on") {
     return { error: "Confirme que leu as condições da simulação." };
+  }
+
+  // Declaração de garantias. É obrigatória: sem ela a análise não tem como
+  // diferenciar quem tem garantia de quem não tem.
+  const seguroTipo = String(formData.get("seguro_tipo") ?? "").trim();
+  const seguroDescricao = String(formData.get("seguro_descricao") ?? "").trim().slice(0, 300);
+
+  if (!seguroTipo) {
+    return { error: "Informe se você possui algum tipo de seguro ou garantia." };
+  }
+  if (!(SEGURO_TIPOS as readonly string[]).includes(seguroTipo)) {
+    return { error: "Opção de seguro inválida." };
+  }
+  if (seguroTipo === "outro" && seguroDescricao.length < 3) {
+    return { error: "Descreva a sua situação no campo indicado." };
   }
 
   const supabase = await createClient();
@@ -24,22 +64,26 @@ export async function requestLoan(_prev: LoanFormState, formData: FormData): Pro
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?next=/conta/emprestimo");
 
-  // Crédito só para identidade verificada — mesma regra da conta bancária.
-  const { data: podeMovimentar } = await supabase.rpc("kyc_pode_movimentar", { p_user_id: null });
-  if (podeMovimentar !== true) {
-    return {
-      error:
-        "Conclua sua verificação de identidade para pedir empréstimo. Leva poucos minutos em Minha verificação.",
-    };
-  }
-
-  const { error } = await supabase.from("loan_requests").insert({ amount, installments });
+  /*
+   * A criação passa pela função `loan_request`, e não por `.insert()` direto.
+   *
+   * Motivo: `authenticated` não tem INSERT em nenhuma tabela deste sistema —
+   * toda escrita passa por função SECURITY DEFINER, que valida as regras no
+   * banco. O insert direto sempre falhava com "permission denied", e o cliente
+   * não conseguia pedir empréstimo. A função valida faixa, prazo, garantia e o
+   * KYC de uma vez.
+   */
+  const { error } = await supabase.rpc("loan_request", {
+    p_amount: amount,
+    p_installments: installments,
+    p_seguro_tipo: seguroTipo,
+    p_seguro_descricao: seguroTipo === "outro" ? seguroDescricao : null,
+  });
 
   if (error) {
-    if (error.code === "23505") {
-      return { error: "Você já tem um pedido em andamento. Aguarde a análise." };
-    }
-    return { error: "Não foi possível enviar o pedido. Tente novamente." };
+    // A função devolve mensagens legíveis; só não vazamos erro cru do banco.
+    const msg = error.message.replace(/^.*?:\s*/, "");
+    return { error: msg || "Não foi possível enviar o pedido. Tente novamente." };
   }
 
   revalidatePath("/conta");
