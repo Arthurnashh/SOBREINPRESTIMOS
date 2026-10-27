@@ -20,13 +20,36 @@ export const PERIODO: Record<
     porMes: number;
     /** Prefixo da contagem: "6 semanas", "6 quinzenas", "6 meses". */
     unidade: string;
+    /** Como dizer a taxa: "3,99% por semana". */
+    porPeriodo: string;
     /** Opções de prazo oferecidas nesta modalidade. */
     opcoes: readonly number[];
   }
 > = {
-  semanal: { label: "Semanal", dias: 7, porMes: 4.345, unidade: "semanas", opcoes: [12, 24] },
-  quinzenal: { label: "Quinzenal", dias: 15, porMes: 2.174, unidade: "quinzenas", opcoes: [12, 18] },
-  mensal: { label: "Mensal", dias: 30, porMes: 1, unidade: "meses", opcoes: [6, 12, 18, 24] },
+  semanal: {
+    label: "Semanal",
+    dias: 7,
+    porMes: 4.345,
+    unidade: "semanas",
+    porPeriodo: "por semana",
+    opcoes: [12, 24],
+  },
+  quinzenal: {
+    label: "Quinzenal",
+    dias: 15,
+    porMes: 2.174,
+    unidade: "quinzenas",
+    porPeriodo: "por quinzena",
+    opcoes: [12, 18],
+  },
+  mensal: {
+    label: "Mensal",
+    dias: 30,
+    porMes: 1,
+    unidade: "meses",
+    porPeriodo: "por mês",
+    opcoes: [6, 12, 18, 24],
+  },
 };
 
 export function ehPeriodicidade(v: string): v is Periodicidade {
@@ -146,8 +169,12 @@ export function simulate(
   const installmentValue = round2(pmt(financed, taxa, installments));
   const total = round2(installmentValue * installments);
 
-  // O CET é a taxa mensal que reproduz o fluxo. Para semanal/quinzenal, o
-  // número de parcelas é convertido para meses antes de calcular.
+  /*
+   * O CET é a taxa mensal que reproduz o fluxo real de pagamentos. Para
+   * semanal e quinzenal, o número de parcelas é convertido para meses antes
+   * de calcular — senão o CET sairia igual ao mensal e esconderia que pagar
+   * de semana em semana custa mais caro no ano.
+   */
   const mesesEquivalentes = installments / PERIODO[periodicidade].porMes;
   const cetMensalDoFluxo = cet(amount, installmentValue, mesesEquivalentes);
 

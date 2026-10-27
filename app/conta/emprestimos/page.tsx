@@ -184,7 +184,7 @@ export default async function MeusEmprestimosPage() {
                 <dt>Taxa do período</dt>
                 <dd>
                   {p.taxa_periodo != null
-                    ? `${pct(Number(p.taxa_periodo))} por ${per.label.toLowerCase().replace("al", "")}`
+                    ? `${pct(Number(p.taxa_periodo))} ${per.porPeriodo}`
                     : p.monthly_rate != null
                     ? `${pct(Number(p.monthly_rate))} a.m.`
                     : "—"}

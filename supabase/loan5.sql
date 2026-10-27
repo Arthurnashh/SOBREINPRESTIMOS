@@ -263,17 +263,10 @@ begin
      set charge_id = boleto.id, updated_at = now()
    where id = par.id;
 
-  -- bank_receipts usa `title` e `payload`, não `description`/`metadata`.
-  insert into public.bank_receipts (user_id, kind, title, payload)
-  values (
-    uid,
-    'boleto',
-    'Parcela ' || par.numero || ' — aguardando confirmação de pagamento',
-    jsonb_build_object(
-      'installment_id', par.id, 'loan_id', par.loan_id,
-      'gateway', 'pendente', 'linha_digitavel', boleto.barcode, 'valor', par.valor
-    )
-  );
+  -- Não gravamos recibo aqui. `bank_receipts.transaction_id` é obrigatório, e
+  -- a cobrança ainda não movimenta dinheiro — recibo é comprovante de
+  -- pagamento, e emitir um sem pagamento seria mentir para o cliente. O
+  -- recibo passa a ser gerado pela conciliação quando o gateway confirmar.
 
   return jsonb_build_object(
     'ok', true, 'charge_id', boleto.id, 'linha_digitavel', boleto.barcode,

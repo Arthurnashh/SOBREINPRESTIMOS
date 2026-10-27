@@ -190,17 +190,24 @@ ok("a página abre", pagina.includes("Meus empréstimos"));
 ok("mostra o valor da parcela", /105,00/.test(pagina), "não achei R$ 105,00");
 ok("mostra o saldo devedor", /Saldo devedor/.test(pagina));
 ok("mostra o quanto já foi pago", /Já pago/.test(pagina));
-ok("mostra a lista de parcelas", /Parcelas/.test(pagina));
-ok("mostra a contagem 1 de 12", /1\/12/.test(pagina));
-ok("tem o botão de gerar boleto/PIX", /Gerar boleto\/PIX/.test(pagina));
+ok("mostra a lista de parcelas", /Parcela<\/th>|Parcelas/.test(pagina));
+// O React quebra o texto em nós, então comparamos sem tags.
+const textoPag = pagina.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+ok("mostra a contagem 1/12", /1\/12/.test(textoPag));
+ok("mostra todas as 12 parcelas", /12\/12/.test(textoPag));
+ok("mostra os vencimentos", /de nov\. de 2026|de dez\. de 2026/.test(textoPag));
+ok("as parcelas começam em aberto", /Em aberto/.test(textoPag));
+ok("tem o botão de gerar boleto/PIX", /Gerar boleto\/PIX/.test(textoPag));
 ok("o menu tem Meus empréstimos", /href="\/conta\/emprestimos"/.test(pagina));
 
 /* A página de pedido mostra a escolha de periodicidade. */
 const pedirPagina = await (await fetch(`${SITE}/conta/emprestimo`, { headers: { cookie } })).text();
-ok("a página de pedido mostra Semanal", /Semanal/.test(pedirPagina));
-ok("a página de pedido mostra Quinzenal", /Quinzenal/.test(pedirPagina));
-ok("a página de pedido mostra Mensal", /Mensal/.test(pedirPagina));
-ok("a página mostra a taxa por período", /por semana|por quinzena|por m/i.test(pedirPagina));
+const textoPed = pedirPagina.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+ok("a página de pedido mostra Semanal", /Semanal/.test(textoPed));
+ok("a página de pedido mostra Quinzenal", /Quinzenal/.test(textoPed));
+ok("a página de pedido mostra Mensal", /Mensal/.test(textoPed));
+ok("a página mostra a taxa por período", /por semana|por quinzena|por m\u00eas/.test(textoPed), textoPed.slice(textoPed.indexOf("Juros"), textoPed.indexOf("Juros") + 90));
+ok("a taxa não sai com palavra quebrada", !/por mens\b/.test(textoPed));
 
 /* ------------------------------ limpeza ------------------------------ */
 await fetch(`${U}/rest/v1/bank_boletos?installment_id=eq.${alvoParcela}`, { method: "DELETE", headers: HS });

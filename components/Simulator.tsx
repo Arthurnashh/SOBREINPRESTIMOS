@@ -117,8 +117,8 @@ export default function Simulator({ mode, initialAmount = 5000, initialInstallme
           <div>
             <dt>Juros</dt>
             <dd>
-              {pct(sim.taxaPeriodo)} por {per.label.toLowerCase().replace("al", "")}
-              <span className="fine"> ({pct(sim.monthlyRate)} a.m.)</span>
+              {pct(sim.taxaPeriodo)} {per.porPeriodo}
+              <span className="fine"> (equivale a {pct(sim.monthlyRate)} a.m.)</span>
             </dd>
           </div>
           <div>
