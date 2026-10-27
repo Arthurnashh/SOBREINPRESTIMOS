@@ -243,13 +243,17 @@ begin
   -- Nosso número estável por parcela: LOAN-<8 primeiros do id da parcela>.
   nosso := 'LOAN-' || upper(substr(replace(par.id::text, '-', ''), 1, 8));
 
-  -- Linha digitável de 47 dígitos. É determinística e serve de referência
-  -- visual; NÃO é um boleto registrado em banco até o gateway entrar.
+  -- Linha digitável de 47 dígitos, no formato de boleto bancário:
+  -- 5 (banco) + 5 (moeda/vencimento) + 10 (valor) + 8 (nosso número)
+  -- + 5 (carteira) + 14 (livre) = 47.
+  -- É determinística e serve de referência visual; NÃO é um boleto
+  -- registrado em banco até o gateway entrar.
   linha := '34191'
            || lpad((extract(epoch from par.vencimento)::bigint % 100000)::text, 5, '0')
            || lpad(((par.valor * 100)::bigint)::text, 10, '0')
            || lpad((abs(hashtext(par.id::text)) % 100000000)::text, 8, '0')
-           || lpad((abs(hashtext(nosso))::bigint % 10000000000000)::text, 14, '0');
+           || lpad((abs(hashtext(nosso))::bigint % 100000)::text, 5, '0')
+           || lpad((abs(hashtext(nosso || par.id::text))::bigint % 100000000000000)::text, 14, '0');
 
   insert into public.bank_boletos
     (user_id, amount, due_date, barcode, beneficiary, status, gateway, nosso_numero, installment_id)

@@ -69,8 +69,13 @@ no painel. Para um site dormente, vale o plano pago de US$25.
    colunas de declaração de seguro/garantia
 9. `supabase/loan4.sql` — **`loan_request()`**: criação do pedido por função.
    Sem ela o cliente não consegue pedir empréstimo (ver nota abaixo)
+10. `supabase/loan5.sql` — **parcelas**: tabela `loan_installments`, geração do
+    cronograma dentro de `bank_credit_loan`, boleto/PIX por parcela
+    (`loan_installment_charge`) e o resumo do contrato (`loan_contrato`)
+11. `supabase/loan6.sql` — **periodicidade**: `loan_request` aceita semanal,
+    quinzenal ou mensal, com a taxa do período gravada no pedido
 
-Os nove são idempotentes (`if not exists` / `drop policy if exists` /
+Os onze são idempotentes (`if not exists` / `drop policy if exists` /
 `create or replace`), então rodar de novo não quebra nada.
 
 > **Ordem importa.** `bank.sql` redefine `handle_new_user()` para também abrir
